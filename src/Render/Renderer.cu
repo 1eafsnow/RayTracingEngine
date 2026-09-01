@@ -512,8 +512,19 @@ __device__ __forceinline__ bool EvaluateBRDF(RayHitResult* hitResult, const Vect
     return true;
 }
 
-__device__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, Sphere* light, RaySampleResult* sampleResult)
+__device__ __forceinline__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, Sphere* light, RaySampleResult* sampleResult)
 {
+    if (light == nullptr || sampleResult == nullptr || light->materialIdx < 0 || light->materialIdx >= DevWorld->materialsSize)
+    {
+        return false;
+    }
+
+    Material* lightMaterial = DevWorld->materials + light->materialIdx;
+    if (!lightMaterial->isEmit || lightMaterial->intensity <= 0.0f)
+    {
+        return false;
+    }
+
     const Vector3 incident = -ray->direction;
     const Vector3 exiting = WeightedSampleSphereLight(state, hitResult->location, light->worldLocation, light->radius);
     const float cosout = Dot(hitResult->normal, exiting);
@@ -547,6 +558,30 @@ __device__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitRe
     sampleResult->cosine = cosout;
     sampleResult->attenuation = 1.0f;
     return true;
+}
+
+__device__ __forceinline__ Vector3 EstimateDirectLighting(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult)
+{
+    Vector3 directRadiance(0.0f, 0.0f, 0.0f);
+    for (int i = 0; i < DevWorld->lightsSize; i++)
+    {
+        Sphere* light = DevWorld->lights + i;
+        if (light->materialIdx < 0 || light->materialIdx >= DevWorld->materialsSize)
+        {
+            continue;
+        }
+
+        Material* lightMaterial = DevWorld->materials + light->materialIdx;
+        RaySampleResult directSample;
+        if (!DirectLightSample(state, ray, hitResult, light, &directSample) || directSample.pdf <= 0.0f)
+        {
+            continue;
+        }
+
+        const Vector3 emitted = lightMaterial->emit * lightMaterial->intensity;
+        directRadiance = directRadiance + emitted * directSample.brdf * (directSample.cosine / directSample.pdf);
+    }
+    return directRadiance;
 }
 
 __device__ __forceinline__ bool IndirectLightSampleRandom(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, RaySampleResult* sampleResult)
@@ -643,10 +678,39 @@ __device__ __forceinline__ bool IndirectLightSample(curandStateXORWOW_t* state, 
     }
 }
 
-__device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray, int sampleDepth, int sampleMode)
+__device__ __forceinline__ bool SamplingUsesDirect(int samplingMode)
 {
+    const SamplingMode mode = static_cast<SamplingMode>(samplingMode);
+    return mode == SamplingMode::DirectOnly || mode == SamplingMode::DirectUniformHemisphere || mode == SamplingMode::DirectCosineHemisphere || mode == SamplingMode::DirectGGX;
+}
+
+__device__ __forceinline__ bool SamplingUsesIndirect(int samplingMode)
+{
+    return static_cast<SamplingMode>(samplingMode) != SamplingMode::DirectOnly;
+}
+
+__device__ __forceinline__ int ResolveIndirectSampleMode(int samplingMode)
+{
+    const SamplingMode mode = static_cast<SamplingMode>(samplingMode);
+    if (mode == SamplingMode::UniformHemisphere || mode == SamplingMode::DirectUniformHemisphere)
+    {
+        return static_cast<int>(IndirectSampleMode::UniformHemisphere);
+    }
+    if (mode == SamplingMode::GGX || mode == SamplingMode::DirectGGX)
+    {
+        return static_cast<int>(IndirectSampleMode::GGX);
+    }
+    return static_cast<int>(IndirectSampleMode::CosineHemisphere);
+}
+
+__device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray, int sampleDepth, int samplingMode)
+{
+    Vector3 radiance(0.0f, 0.0f, 0.0f);
     Vector3 throughput(1.0f, 1.0f, 1.0f);
     const int maxDepth = Max(sampleDepth, 1);
+    const bool useDirect = SamplingUsesDirect(samplingMode);
+    const bool useIndirect = SamplingUsesIndirect(samplingMode);
+    const int indirectSampleMode = ResolveIndirectSampleMode(samplingMode);
 
     for (int i = 0; i < maxDepth; i++)
     {
@@ -654,17 +718,32 @@ __device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, 
         WorldHitDetect(ray, &hit);
         if (!hit.isHit)
         {
-            return Vector3(0.0f, 0.0f, 0.0f);
+            return radiance;
         }
+
         if (hit.material != nullptr && hit.material->isEmit)
         {
-            return hit.material->emit * hit.material->intensity * throughput;
+            if (!useDirect || i == 0)
+            {
+                radiance = radiance + hit.material->emit * hit.material->intensity * throughput;
+            }
+            return radiance;
+        }
+
+        if (useDirect)
+        {
+            radiance = radiance + throughput * EstimateDirectLighting(state, ray, &hit);
+        }
+
+        if (!useIndirect)
+        {
+            return radiance;
         }
 
         RaySampleResult sampleResult;
-        if (!IndirectLightSample(state, ray, &hit, &sampleResult, sampleMode) || sampleResult.pdf <= 0.0f)
+        if (!IndirectLightSample(state, ray, &hit, &sampleResult, indirectSampleMode) || sampleResult.pdf <= 0.0f)
         {
-            return Vector3(0.0f, 0.0f, 0.0f);
+            return radiance;
         }
 
         throughput = throughput * sampleResult.brdf * (sampleResult.cosine / sampleResult.pdf);
@@ -675,13 +754,13 @@ __device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, 
             const float survivalProbability = Clamp(Max(throughput.x, Max(throughput.y, throughput.z)), 0.05f, 0.95f);
             if (DevRandOpen(state) > survivalProbability)
             {
-                return Vector3(0.0f, 0.0f, 0.0f);
+                return radiance;
             }
             throughput = throughput / survivalProbability;
         }
     }
 
-    return Vector3(0.0f, 0.0f, 0.0f);
+    return radiance;
 }
 
 __device__ __forceinline__ void StoreToneMappedPixel(uint8_t* pixels, int idx, const Vector3& linearColor)
@@ -693,7 +772,7 @@ __device__ __forceinline__ void StoreToneMappedPixel(uint8_t* pixels, int idx, c
     pixels[idx * 4 + 3] = 255;
 }
 
-__global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uint8_t* pixels, int sampleCount, int width, int height, int sampleDepth, int sampleMode, int filterKernelSize,
+__global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uint8_t* pixels, int sampleCount, int width, int height, int sampleDepth, int samplingMode, int filterKernelSize,
     float cameraFocus, float cameraX, float cameraY, float cameraZ,
     float r00, float r01, float r02, float r10, float r11, float r12, float r20, float r21, float r22,
     float translateX, float scaleX, float translateY, float scaleY)
@@ -717,7 +796,7 @@ __global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uin
     worldDirection.Normalize();
 
     Ray ray(Vector3(cameraX, cameraY, cameraZ), worldDirection);
-    const Vector3 color = FullPathRayTrace(state, &ray, sampleDepth, sampleMode);
+    const Vector3 color = FullPathRayTrace(state, &ray, sampleDepth, samplingMode);
 
     float* radiant = radiants + idx * 4;
     const float blend = 1.0f / static_cast<float>(sampleCount + 1);
@@ -1156,7 +1235,7 @@ void Renderer::Tick(float deltaTime)
         }
     }
 
-    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRadiometry, outputPixels, frame, width, height, sampleDepth, static_cast<int>(indirectSampleMode), filterKernelSize,
+    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRadiometry, outputPixels, frame, width, height, sampleDepth, static_cast<int>(samplingMode), filterKernelSize,
         camera->focus, camera->worldLocation.x, camera->worldLocation.y, camera->worldLocation.z,
         cameraMatrix.elements[0], cameraMatrix.elements[1], cameraMatrix.elements[2],
         cameraMatrix.elements[4], cameraMatrix.elements[5], cameraMatrix.elements[6],
