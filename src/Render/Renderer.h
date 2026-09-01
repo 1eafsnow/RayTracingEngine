@@ -9,6 +9,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
 #include <device_launch_parameters.h>
 
 enum class IndirectSampleMode : int
@@ -45,6 +46,7 @@ public:
     int width = 0;
     int height = 0;
     uint8_t* pixelsData = nullptr;
+    bool pixelsDataPinned = false;
 
     float translateX = 0.0f;
     float translateY = 0.0f;
@@ -67,6 +69,10 @@ public:
     uint8_t* devPixels = nullptr;
     DeviceWorld devWorld{};
 
+    cudaGraphicsResource* cudaPixelBufferResource = nullptr;
+    unsigned int pixelBufferObject = 0;
+    bool graphicsInteropEnabled = false;
+
     int devThreadNum = 256;
 
     float sampleProb = 0.8f;
@@ -86,6 +92,10 @@ public:
     void Tick(float deltaTime);
     void Tick2(float deltaTime);
     void TestTick(float deltaTime);
+
+    bool RegisterOpenGLPixelBuffer(unsigned int bufferObject);
+    void UnregisterOpenGLPixelBuffer();
+    bool IsGraphicsInteropEnabled() const;
 };
 
 void Test();
