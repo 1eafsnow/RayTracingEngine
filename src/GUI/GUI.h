@@ -1,12 +1,12 @@
 #pragma once
-#include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
 #define GLFW_INCLUDE_NONE
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 #include <Render/Renderer.h>
 #include <vector>
 
