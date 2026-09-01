@@ -52,7 +52,6 @@ public:
     float scaleY = 0.0f;
 
     curandStateXORWOW_t* devRandStates = nullptr;
-    Camera* devCamera = nullptr;
     Vertex* devVertices = nullptr;
     Sphere* devSpheres = nullptr;
     Triangle* devTriangles = nullptr;
