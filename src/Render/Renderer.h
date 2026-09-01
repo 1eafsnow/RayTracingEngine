@@ -106,6 +106,7 @@ public:
     bool RegisterOpenGLPixelBuffers(const unsigned int* bufferObjects, int count);
     void PrepareOpenGLPixelBufferForFrame();
     void UnregisterOpenGLPixelBuffers();
+    int GetCompletedOpenGLPixelBufferIndex() const;
     unsigned int GetCompletedOpenGLPixelBufferObject() const;
 };
 

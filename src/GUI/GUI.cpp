@@ -176,28 +176,21 @@ void GUI::UpdateRenderTexture()
         return;
     }
 
-    const GLuint completedPbo = renderer->GetCompletedOpenGLPixelBufferObject();
-    if (renderer->IsGraphicsInteropEnabled() && completedPbo != 0)
+    const int completedIndex = renderer->GetCompletedOpenGLPixelBufferIndex();
+    if (renderer->IsGraphicsInteropEnabled() && completedIndex >= 0 && completedIndex < Renderer::OpenGLPixelBufferCount)
     {
-        int uploadIndex = 0;
-        for (int i = 0; i < Renderer::OpenGLPixelBufferCount; i++)
+        const GLuint completedPbo = pixelBufferObjects[completedIndex];
+        if (completedPbo == 0 || renderTextures[completedIndex] == 0)
         {
-            if (pixelBufferObjects[i] == completedPbo)
-            {
-                uploadIndex = i;
-                break;
-            }
+            return;
         }
 
-        if (renderTextures[uploadIndex] != 0)
-        {
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, completedPbo);
-            glBindTexture(GL_TEXTURE_2D, renderTextures[uploadIndex]);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-            displayTextureIndex = uploadIndex;
-        }
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, completedPbo);
+        glBindTexture(GL_TEXTURE_2D, renderTextures[completedIndex]);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        displayTextureIndex = completedIndex;
     }
     else if (renderer->pixelsData != nullptr && renderTextures[0] != 0)
     {
