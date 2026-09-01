@@ -5,26 +5,30 @@
 class Camera
 {
 public:
-	float focus;
-	float fovX;
-	float fovY;
+    float focus;
+    float fovX;
+    float fovY;
 
-	float moveSpeed;
-	float lookSpeed;
+    float moveSpeed;
+    float lookSpeed;
 
-	float deltaMoveSpeed;
-	float deltaLookSpeed;
+    float deltaMoveSpeed;
+    float deltaLookSpeed;
 
-	Vector3 worldLocation;
-	Rotator worldRotation;
+    Vector3 worldLocation;
+    Rotator worldRotation;
 
-	Camera();
-	Camera(float focus, float fovX, float fovY);
-	
-	void Move(Vector3 direction);
-	void Look(Vector3 direction);
+    Camera();
+    Camera(float focus, float fovX, float fovY);
 
-	void Tick(float deltaTime);
+    void Move(const Vector3& direction);
+    void Look(const Vector3& direction);
+    void Tick(float deltaTime);
+
+    Vector3 GetForwardVector() const;
+    Vector3 GetRightVector() const;
+    Vector3 GetUpVector() const;
+    Matrix4 GetRotationMatrix() const;
 };
 
 Camera* GetCamera();
