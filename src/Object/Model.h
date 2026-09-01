@@ -14,9 +14,9 @@ public:
 
     std::vector<Mesh*> meshes;
 
-    float x1 = std::numeric_limits<float>::max();
-    float y1 = std::numeric_limits<float>::max();
-    float z1 = std::numeric_limits<float>::max();
+    float x1 = (std::numeric_limits<float>::max)();
+    float y1 = (std::numeric_limits<float>::max)();
+    float z1 = (std::numeric_limits<float>::max)();
     float x2 = std::numeric_limits<float>::lowest();
     float y2 = std::numeric_limits<float>::lowest();
     float z2 = std::numeric_limits<float>::lowest();
