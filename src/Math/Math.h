@@ -26,7 +26,7 @@ __host__ float RandomOpen();
 
 __host__ float Random(const float& min, const float& max, const bool& lInterval, const bool& rInterval);
 
-__global__ void InitRandStates(curandStateXORWOW_t* states, unsigned long long seed);
+__global__ void InitRandStates(curandStateXORWOW_t* states, unsigned long long seed, int stateCount);
 
 __device__ float DevRand(curandStateXORWOW_t* state);
 
