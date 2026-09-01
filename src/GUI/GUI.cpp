@@ -36,6 +36,16 @@ bool GUI::Open()
     glfwMakeContextCurrent(glWindow);
     glfwSwapInterval(0);
 
+    glewExperimental = GL_TRUE;
+    GLenum glewError = glewInit();
+    if (glewError != GLEW_OK)
+    {
+        fprintf(stderr, "GLEW initialization failed: %s\n", reinterpret_cast<const char*>(glewGetErrorString(glewError)));
+        Close();
+        return false;
+    }
+    glGetError();
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     io = &ImGui::GetIO();
@@ -55,13 +65,49 @@ bool GUI::Open()
         return false;
     }
 
+    glGenBuffers(1, &pixelBufferObject);
+    if (pixelBufferObject != 0)
+    {
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pixelBufferObject);
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, static_cast<GLsizeiptr>(pixelWidth) * pixelHeight * 4, nullptr, GL_STREAM_DRAW);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    }
+
     glViewport(0, 0, pixelWidth, pixelHeight);
     glRasterPos2f(-1.0f, -1.0f);
     return true;
 }
 
+bool GUI::InitializeRendererInterop()
+{
+    if (renderer == nullptr || pixelBufferObject == 0)
+    {
+        return false;
+    }
+
+    if (!renderer->RegisterOpenGLPixelBuffer(pixelBufferObject))
+    {
+        fprintf(stderr, "CUDA/OpenGL PBO interop unavailable, using pinned-host fallback.\n");
+        return false;
+    }
+
+    return true;
+}
+
 void GUI::Close()
 {
+    if (renderer != nullptr)
+    {
+        renderer->UnregisterOpenGLPixelBuffer();
+    }
+
+    if (pixelBufferObject != 0 && glWindow != nullptr)
+    {
+        glfwMakeContextCurrent(glWindow);
+        glDeleteBuffers(1, &pixelBufferObject);
+        pixelBufferObject = 0;
+    }
+
     if (ImGui::GetCurrentContext() != nullptr)
     {
         ImGui_ImplOpenGL3_Shutdown();
@@ -94,11 +140,23 @@ void GUI::Tick(float deltaTime)
     const float renderFps = renderer->frameTime > 0 ? 1000.0f / static_cast<float>(renderer->frameTime) : 0.0f;
     ImGui::Text("Render average %lld ms/frame (%.1f FPS)", static_cast<long long>(renderer->frameTime), renderFps);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
+    ImGui::Text("Pixel transfer: %s", renderer->IsGraphicsInteropEnabled() ? "CUDA/OpenGL PBO" : "Pinned host memory");
     ImGui::End();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    glDrawPixels(pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, static_cast<GLvoid*>(renderer->pixelsData));
+
+    if (renderer->IsGraphicsInteropEnabled() && pixelBufferObject != 0)
+    {
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pixelBufferObject);
+        glDrawPixels(pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    }
+    else
+    {
+        DrawPixels(renderer->pixelsData);
+    }
+
     glfwSwapBuffers(glWindow);
 }
 
