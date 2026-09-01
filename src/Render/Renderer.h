@@ -1,5 +1,7 @@
 #pragma once
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 #include <Math/Math.h>
 #include <Render/Ray.h>
 #include <Object/Camera.h>
@@ -31,54 +33,51 @@ public:
 	{
 		cudaMemcpy(host, dev, sizeof(T), cudaMemcpyKind::cudaMemcpyDeviceToHost);
 	}
-
 };
 
 class Renderer
 {
 public:
 	int index = 0;
-	int width;
-	int height;
-	uint8_t* pixelsData;
+	int width = 0;
+	int height = 0;
+	uint8_t* pixelsData = nullptr;
 
-	float translateX;
-	float translateY;
-	float scaleX;
-	float scaleY;
+	float translateX = 0.0f;
+	float translateY = 0.0f;
+	float scaleX = 0.0f;
+	float scaleY = 0.0f;
 
-	curandStateXORWOW_t* devRandStates;
-	Camera* devCamera;
-	Vertex* devVertices;
-	Sphere* devSpheres;
-	Triangle* devTriangles;
-	Quadrilateral* devQuadrilaterals;
-	Mesh* devMeshes;
-	Sphere* devLights;
-	Material* devMaterials;
-	Texture* devTextures;
-	uint8_t* devTexturePixels;
-	Ray* devRays;
-	RayHitResult* devHitResults;
-	float* devRadiometry;
-	uint8_t* devPixels;
-	DeviceWorld devWorld;
+	curandStateXORWOW_t* devRandStates = nullptr;
+	Camera* devCamera = nullptr;
+	Vertex* devVertices = nullptr;
+	Sphere* devSpheres = nullptr;
+	Triangle* devTriangles = nullptr;
+	Quadrilateral* devQuadrilaterals = nullptr;
+	Mesh* devMeshes = nullptr;
+	Sphere* devLights = nullptr;
+	Material* devMaterials = nullptr;
+	Texture* devTextures = nullptr;
+	uint8_t* devTexturePixels = nullptr;
+	Ray* devRays = nullptr;
+	RayHitResult* devHitResults = nullptr;
+	float* devRadiometry = nullptr;
+	uint8_t* devPixels = nullptr;
+	DeviceWorld devWorld{};
 
-	int devThreadNum;	
+	int devThreadNum = 256;
 
-	float sampleProb = 0.8;
+	float sampleProb = 0.8f;
 	int sampleDepth = 8;
 	int sampleTimes = 32;
 	int filterKernelSize = 1;
 
 	int sampleCount = 0;
-
 	int frame = 0;
-	int64_t timer;
-	int64_t frameTime;
+	int64_t timer = 0;
+	int64_t frameTime = 0;
 
 	void Init();
-	
 	void Tick(float deltaTime);
 	void Tick2(float deltaTime);
 	void TestTick(float deltaTime);
