@@ -159,16 +159,53 @@ __device__ void WorldHitDetect(Ray* ray, RayHitResult* hitResult)
     }
 }
 
-__device__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, Sphere* light, RaySampleResult* sampleResult)
+__device__ bool EvaluateBRDF(RayHitResult* hitResult, const Vector3& incident, const Vector3& exiting, Vector3* brdf)
 {
-    Vector3 incident = -ray->direction;
-    Vector3 exiting = WeightedSampleSphereLight(state, hitResult->location, light->worldLocation, light->radius);
-    if (Dot(hitResult->normal, exiting) < 0.0f)
+    Vector3 normal = hitResult->normal.GetNormalized();
+    float NoV = Dot(normal, incident);
+    float NoL = Dot(normal, exiting);
+    if (NoV <= 0.0f || NoL <= 0.0f || hitResult->material == nullptr)
     {
         return false;
     }
 
-    Ray sampleRay(hitResult->location, exiting);
+    Vector3 halfVectorRaw = incident + exiting;
+    float halfLengthSquared = Dot(halfVectorRaw, halfVectorRaw);
+    if (halfLengthSquared <= 1e-12f)
+    {
+        return false;
+    }
+
+    Vector3 h = halfVectorRaw / sqrtf(halfLengthSquared);
+    float VoH = Max(Dot(incident, h), 0.0f);
+    if (VoH <= 0.0f)
+    {
+        return false;
+    }
+
+    float roughness = Clamp(hitResult->material->roughness, 0.001f, 1.0f);
+    float fresnel = SchlickFresnel(1.0f, hitResult->material->refractionIndex, h, incident);
+    float distribution = NDF_GGX(normal, h, roughness);
+    float geometry = GF_SmithJointGGX(normal, incident, exiting, roughness);
+
+    Vector3 diffuse = hitResult->color * ((1.0f - fresnel) / PI);
+    float specularScale = fresnel * distribution * geometry / Max(4.0f * NoV * NoL, 1e-8f);
+    Vector3 specular(specularScale, specularScale, specularScale);
+    *brdf = diffuse + specular;
+    return true;
+}
+
+__device__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, Sphere* light, RaySampleResult* sampleResult)
+{
+    Vector3 incident = -ray->direction;
+    Vector3 exiting = WeightedSampleSphereLight(state, hitResult->location, light->worldLocation, light->radius);
+    float cosout = Dot(hitResult->normal, exiting);
+    if (cosout <= 0.0f)
+    {
+        return false;
+    }
+
+    Ray sampleRay(hitResult->location + hitResult->normal * (MIN_DETECT_DISTANCE * 2.0f), exiting);
     RayHitResult sampleHitResult;
     WorldHitDetect(&sampleRay, &sampleHitResult);
     if (!sampleHitResult.isHit || sampleHitResult.objectId != light->id)
@@ -176,68 +213,44 @@ __device__ bool DirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitRe
         return false;
     }
 
-    float cosin = Dot(incident, hitResult->normal);
-    float cosout = Dot(exiting, hitResult->normal);
-    if (cosin <= 0.0f || cosout <= 0.0f)
+    if (!EvaluateBRDF(hitResult, incident, exiting, &sampleResult->brdf))
     {
         return false;
     }
-
-    Vector3 h = (incident + exiting).GetNormalized();
-    float f = SchlickFresnel(1.0f, hitResult->material->refractionIndex, h, incident);
-    float d = NDF_GGX(hitResult->normal, h, hitResult->material->roughness);
-    float g = GF_SchlickGGX(hitResult->normal, incident, exiting, hitResult->material->roughness);
-    sampleResult->brdf = hitResult->color * (1.0f / PI) + Vector3(1.0f, 1.0f, 1.0f) * ((f * d * g) / (4.0f * cosin * cosout));
 
     float dist = (light->worldLocation - hitResult->location).Length();
     if (dist <= light->radius)
     {
         return false;
     }
-    float cosa = sqrtf(Max(0.0f, 1.0f - (light->radius * light->radius) / (dist * dist)));
-    Vector3 v1 = (light->worldLocation - hitResult->location).GetNormalized();
-    Vector3 delta = sampleHitResult.location - hitResult->location;
-    float sampleDistance = delta.Length();
-    if (sampleDistance <= 0.0f)
-    {
-        return false;
-    }
-    Vector3 v2 = delta / sampleDistance;
-    sampleResult->pdf = 1.0f / (2.0f * PI * (1.0f - cosa)) * Dot(v1, v2) / sampleDistance;
+
+    float sinThetaMax2 = Clamp((light->radius * light->radius) / (dist * dist), 0.0f, 1.0f);
+    float cosThetaMax = sqrtf(Max(0.0f, 1.0f - sinThetaMax2));
+    sampleResult->pdf = 1.0f / Max(2.0f * PI * (1.0f - cosThetaMax), 1e-8f);
     sampleResult->cosine = cosout;
-    float hitDist = hitResult->distance / 20.0f;
-    sampleResult->attenuation = hitDist > 1.0f ? hitDist * hitDist : 1.0f;
-    return sampleResult->pdf > 0.0f;
+    sampleResult->attenuation = 1.0f;
+    return true;
 }
 
 __device__ bool IndirectLightSampleRandom(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, RaySampleResult* sampleResult)
 {
     Vector3 incident = -ray->direction;
     Vector3 exiting = WeightedSampleRandom(state, hitResult->normal);
-    if (Dot(hitResult->normal, exiting) <= 0.0f)
+    float cosout = Dot(hitResult->normal, exiting);
+    if (cosout <= 0.0f)
     {
         return false;
     }
 
-    Vector3 h = (incident + exiting).GetNormalized();
-    float cosine = Dot(incident, hitResult->normal);
-    float cosout = Dot(exiting, hitResult->normal);
-    if (cosine <= 0.0f || cosout <= 0.0f)
+    if (!EvaluateBRDF(hitResult, incident, exiting, &sampleResult->brdf))
     {
         return false;
     }
 
-    float a = hitResult->material->roughness;
-    float f = SchlickFresnel(1.0f, hitResult->material->refractionIndex, h, incident);
-    float d = NDF_GGX(hitResult->normal, h, a);
-    float g = GF_SchlickGGX(hitResult->normal, incident, exiting, a);
-    sampleResult->brdf = hitResult->color * (1.0f / PI) + Vector3(1.0f, 1.0f, 1.0f) * ((f * d * g) / (4.0f * cosine * cosout));
     sampleResult->pdf = 1.0f / (2.0f * PI);
     sampleResult->cosine = cosout;
-    float hitDist = hitResult->distance / 10.0f;
-    sampleResult->attenuation = hitDist > 1.0f ? hitDist * hitDist : 1.0f;
-
-    ray->location = hitResult->location;
+    sampleResult->attenuation = 1.0f;
+    ray->location = hitResult->location + hitResult->normal * (MIN_DETECT_DISTANCE * 2.0f);
     ray->direction = exiting;
     return true;
 }
@@ -246,71 +259,79 @@ __device__ bool IndirectLightSampleCosine(curandStateXORWOW_t* state, Ray* ray, 
 {
     Vector3 incident = -ray->direction;
     Vector3 exiting = WeightedSampleCosine(state, hitResult->normal);
-    if (Dot(hitResult->normal, exiting) <= 0.0f)
+    float cosout = Dot(hitResult->normal, exiting);
+    if (cosout <= 0.0f)
     {
         return false;
     }
 
-    Vector3 h = (incident + exiting).GetNormalized();
-    float cosine = Dot(incident, hitResult->normal);
-    float cosout = Dot(exiting, hitResult->normal);
-    if (cosine <= 0.0f || cosout <= 0.0f)
+    if (!EvaluateBRDF(hitResult, incident, exiting, &sampleResult->brdf))
     {
         return false;
     }
 
-    float a = hitResult->material->roughness;
-    float f = SchlickFresnel(1.0f, hitResult->material->refractionIndex, h, incident);
-    float d = NDF_GGX(hitResult->normal, h, a);
-    float g = GF_SchlickGGX(hitResult->normal, incident, exiting, a);
-    sampleResult->brdf = hitResult->color * (1.0f / PI) + Vector3(1.0f, 1.0f, 1.0f) * ((f * d * g) / (4.0f * cosine * cosout));
     sampleResult->pdf = cosout / PI;
     sampleResult->cosine = cosout;
-    float hitDist = hitResult->distance / 10.0f;
-    sampleResult->attenuation = hitDist > 1.0f ? hitDist * hitDist : 1.0f;
-
-    ray->location = hitResult->location;
+    sampleResult->attenuation = 1.0f;
+    ray->location = hitResult->location + hitResult->normal * (MIN_DETECT_DISTANCE * 2.0f);
     ray->direction = exiting;
-    return true;
+    return sampleResult->pdf > 0.0f;
 }
 
 __device__ bool IndirectLightSampleGGX(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, RaySampleResult* sampleResult)
 {
     Vector3 incident = -ray->direction;
-    float a = hitResult->material->roughness;
-    Vector3 h = WeightedSampleGGX(state, hitResult->normal, a);
+    float roughness = Clamp(hitResult->material->roughness, 0.001f, 1.0f);
+    Vector3 h = WeightedSampleGGX(state, hitResult->normal, roughness);
+    float VoH = Dot(incident, h);
+    if (VoH <= 0.0f)
+    {
+        return false;
+    }
+
     Vector3 exiting = Reflect(h, incident);
-    if (Dot(hitResult->normal, exiting) <= 0.0f)
+    float cosout = Dot(hitResult->normal, exiting);
+    if (cosout <= 0.0f)
     {
         return false;
     }
 
-    float cosine = Dot(incident, hitResult->normal);
-    float cosout = Dot(exiting, hitResult->normal);
-    if (cosine <= 0.0f || cosout <= 0.0f)
+    if (!EvaluateBRDF(hitResult, incident, exiting, &sampleResult->brdf))
     {
         return false;
     }
 
-    float f = SchlickFresnel(1.0f, hitResult->material->refractionIndex, h, incident);
-    float d = NDF_GGX(hitResult->normal, h, a);
-    float g = GF_SchlickGGX(hitResult->normal, incident, exiting, a);
-    sampleResult->brdf = hitResult->color * (1.0f / PI) + Vector3(1.0f, 1.0f, 1.0f) * ((f * d * g) / (4.0f * cosine * cosout));
-    sampleResult->pdf = d * Dot(hitResult->normal, h);
+    float NoH = Max(Dot(hitResult->normal, h), 0.0f);
+    float distribution = NDF_GGX(hitResult->normal, h, roughness);
+    float halfVectorPdf = distribution * NoH;
+    sampleResult->pdf = halfVectorPdf / Max(4.0f * VoH, 1e-8f);
     sampleResult->cosine = cosout;
-    float hitDist = hitResult->distance / 10.0f;
-    sampleResult->attenuation = hitDist > 1.0f ? hitDist * hitDist : 1.0f;
-
-    ray->location = hitResult->location;
+    sampleResult->attenuation = 1.0f;
+    ray->location = hitResult->location + hitResult->normal * (MIN_DETECT_DISTANCE * 2.0f);
     ray->direction = exiting;
     return sampleResult->pdf > 0.0f;
 }
 
-__device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray)
+__device__ bool IndirectLightSample(curandStateXORWOW_t* state, Ray* ray, RayHitResult* hitResult, RaySampleResult* sampleResult, int sampleMode)
 {
-    Vector3 attenuation(1.0f, 1.0f, 1.0f);
+    switch (static_cast<IndirectSampleMode>(sampleMode))
+    {
+    case IndirectSampleMode::UniformHemisphere:
+        return IndirectLightSampleRandom(state, ray, hitResult, sampleResult);
+    case IndirectSampleMode::GGX:
+        return IndirectLightSampleGGX(state, ray, hitResult, sampleResult);
+    case IndirectSampleMode::CosineHemisphere:
+    default:
+        return IndirectLightSampleCosine(state, ray, hitResult, sampleResult);
+    }
+}
 
-    for (int i = 0; i < 16; i++)
+__device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray, int sampleDepth, int sampleMode)
+{
+    Vector3 throughput(1.0f, 1.0f, 1.0f);
+    int maxDepth = Max(sampleDepth, 1);
+
+    for (int i = 0; i < maxDepth; i++)
     {
         RayHitResult hit;
         WorldHitDetect(ray, &hit);
@@ -320,23 +341,33 @@ __device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray)
         }
         if (hit.material != nullptr && hit.material->isEmit)
         {
-            return hit.material->emit * hit.material->intensity * attenuation;
+            return hit.material->emit * hit.material->intensity * throughput;
         }
 
         RaySampleResult sampleResult;
-        if (!IndirectLightSampleRandom(state, ray, &hit, &sampleResult) || sampleResult.pdf <= 0.0f)
+        if (!IndirectLightSample(state, ray, &hit, &sampleResult, sampleMode) || sampleResult.pdf <= 0.0f)
         {
             return Vector3(0.0f, 0.0f, 0.0f);
         }
 
+        throughput = throughput * sampleResult.brdf * (sampleResult.cosine / sampleResult.pdf);
         ray->depth++;
-        attenuation = attenuation * sampleResult.brdf * sampleResult.cosine / sampleResult.pdf / sampleResult.attenuation;
+
+        if (i >= 3)
+        {
+            float survivalProbability = Clamp(Max(throughput.x, Max(throughput.y, throughput.z)), 0.05f, 0.95f);
+            if (DevRandOpen(state) > survivalProbability)
+            {
+                return Vector3(0.0f, 0.0f, 0.0f);
+            }
+            throughput = throughput / survivalProbability;
+        }
     }
 
     return Vector3(0.0f, 0.0f, 0.0f);
 }
 
-__global__ void KernelRayTrace(curandStateXORWOW_t* states, Ray* rays, float* radiants, int sampleCount, int pixelCount)
+__global__ void KernelRayTrace(curandStateXORWOW_t* states, Ray* rays, float* radiants, int sampleCount, int pixelCount, int sampleDepth, int sampleMode)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx >= pixelCount)
@@ -344,7 +375,7 @@ __global__ void KernelRayTrace(curandStateXORWOW_t* states, Ray* rays, float* ra
         return;
     }
 
-    Vector3 color = FullPathRayTrace(states + idx, rays + idx);
+    Vector3 color = FullPathRayTrace(states + idx, rays + idx, sampleDepth, sampleMode);
     float* radiant = radiants + idx * 4;
     float c1 = static_cast<float>(sampleCount) / static_cast<float>(sampleCount + 1);
     float c2 = 1.0f / static_cast<float>(sampleCount + 1);
@@ -580,7 +611,7 @@ void Renderer::Tick(float deltaTime)
         return;
     }
 
-    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRays, devRadiometry, frame, pixelCount);
+    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRays, devRadiometry, frame, pixelCount, sampleDepth, static_cast<int>(indirectSampleMode));
     if (cudaError_t error = cudaDeviceSynchronize())
     {
         printf("kernel RayTrace failed with error \"%s\".\n", cudaGetErrorString(error));
