@@ -3,6 +3,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <limits>
 
 class Model
 {
@@ -12,12 +13,12 @@ public:
 
 	std::vector<Mesh*> meshes;
 
-	float x1 = FLT_MAX;
-	float y1 = FLT_MAX;
-	float z1 = FLT_MAX;
-	float x2 = FLT_MIN;
-	float y2 = FLT_MIN;
-	float z2 = FLT_MIN;
+	float x1 = std::numeric_limits<float>::max();
+	float y1 = std::numeric_limits<float>::max();
+	float z1 = std::numeric_limits<float>::max();
+	float x2 = std::numeric_limits<float>::lowest();
+	float y2 = std::numeric_limits<float>::lowest();
+	float z2 = std::numeric_limits<float>::lowest();
 
 	Model(const char* path);
 
