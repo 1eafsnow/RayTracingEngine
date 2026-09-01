@@ -16,19 +16,19 @@ public:
 
 struct RaySampleResult
 {
-	Vector3 brdf;
-	float pdf;
-	float cosine;
-	float attenuation;
+	Vector3 brdf = Vector3::Zero;
+	float pdf = 0.0f;
+	float cosine = 0.0f;
+	float attenuation = 1.0f;
 };
 
 struct RayHitResult
 {
 	bool isHit = false;
 	float distance = FLT_MAX;
-	Vector3 location;
-	Vector3 normal;
-	class Material* material;
-	Vector3 color;
-	int objectId;
+	Vector3 location = Vector3::Zero;
+	Vector3 normal = Vector3::Zero;
+	class Material* material = nullptr;
+	Vector3 color = Vector3::Zero;
+	int objectId = -1;
 };
