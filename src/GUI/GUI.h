@@ -28,7 +28,8 @@ public:
     ImGuiIO* io = nullptr;
 
     Renderer* renderer = nullptr;
-    GLuint pixelBufferObject = 0;
+    GLuint pixelBufferObjects[Renderer::OpenGLPixelBufferCount]{};
+    GLuint renderTexture = 0;
 
     bool objectWindow = false;
 
@@ -39,4 +40,7 @@ public:
     void Close();
     void Tick(float deltaTime);
     bool ShouldClose() const;
+
+private:
+    void UpdateRenderTexture();
 };
