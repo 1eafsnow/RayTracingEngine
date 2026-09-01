@@ -137,6 +137,7 @@ int main(int, char**)
 
     while (!gui.ShouldClose())
     {
+        renderer.PrepareOpenGLPixelBufferForFrame();
         renderer.Tick(1);
         gui.Tick(1);
     }
