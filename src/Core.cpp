@@ -115,7 +115,7 @@ int main(int, char**)
     GetCamera()->focus = 0.01;
     GetCamera()->fovX = fovX;
     GetCamera()->fovY = fovY;
-    GetCamera()->worldLocation = Vector3(0.0, -3, -8.0);
+    GetCamera()->worldLocation = Vector3(0.0, -3.0, -4.0);
     GetCamera()->worldRotation = Rotator(0.0, 0.0, 0.0);
 
     Renderer renderer;
