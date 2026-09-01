@@ -316,7 +316,6 @@ __device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray)
         WorldHitDetect(ray, &hit);
         if (!hit.isHit)
         {
-            //edit
             return Vector3(0.0f, 0.0f, 0.0f);
         }
         if (hit.material != nullptr && hit.material->isEmit)
