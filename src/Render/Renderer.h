@@ -11,6 +11,13 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
+enum class IndirectSampleMode : int
+{
+    UniformHemisphere = 0,
+    CosineHemisphere = 1,
+    GGX = 2
+};
+
 template <typename T>
 class Binding
 {
@@ -67,6 +74,7 @@ public:
     int sampleDepth = 8;
     int sampleTimes = 32;
     int filterKernelSize = 1;
+    IndirectSampleMode indirectSampleMode = IndirectSampleMode::CosineHemisphere;
 
     int sampleCount = 0;
     int frame = 0;
