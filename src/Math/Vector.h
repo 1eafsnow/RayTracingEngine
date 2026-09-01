@@ -6,14 +6,10 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-//#define V3F_ZERO Vector3F(0, 0, 0)
-//#define V4F_ZERO Vector4F(0, 0, 0, 0)
-
 template <typename T>
 class _Matrix3;
 template <typename T>
 class _Matrix4;
-
 template <typename T>
 class _Rotator;
 
@@ -26,95 +22,26 @@ public:
 
 	static const _Vector2 Zero;
 
-	__host__ __device__ _Vector2 operator+(const _Vector2& v)
-	{
-		return _Vector2(x + v.x, y + v.y);
-	}
-
-	__host__ __device__ _Vector2 operator-(const _Vector2& v) const
-	{
-		return _Vector2(x - v.x, y - v.y);
-	}
-
-	__host__ __device__ _Vector2 operator*(const _Vector2& v)
-	{
-		return _Vector2(x * v.x, y * v.y);
-	}
-
-	__host__ __device__ _Vector2 operator/(const _Vector2& v)
-	{
-		return _Vector2(x / v.x, y / v.y);
-	}
-
-	__host__ __device__ _Vector2 operator*(const float& s)
-	{
-		return _Vector2(x * s, y * s);
-	}
-
-	__host__ __device__ _Vector2 operator*(const float& s) const
-	{
-		return _Vector2(x * s, y * s);
-	}
-
-	__host__ __device__ _Vector2 operator/(const float& s)
-	{
-		return _Vector2<T>(x / s, y / s);
-	}
-
-	__host__ __device__ _Vector2 operator-()
-	{
-		return _Vector2(-x, -y);
-	}
-
-	__host__ __device__ void operator=(const _Vector2& v)
-	{
-		memcpy(this, &v, sizeof(_Vector2));
-	}
-
-	__host__ __device__ bool operator==(const _Vector2& v)
-	{
-		return x == v.x && y == v.y ? true : false;
-	}
-
-	__host__ __device__ bool operator!=(const _Vector2& v)
-	{
-		return x == v.x && y == v.y ? false : true;
-	}
-
-	__host__ __device__ T& operator[](const int& i)
-	{
-		return x;
-	}
+	__host__ __device__ _Vector2 operator+(const _Vector2& v) { return _Vector2(x + v.x, y + v.y); }
+	__host__ __device__ _Vector2 operator-(const _Vector2& v) const { return _Vector2(x - v.x, y - v.y); }
+	__host__ __device__ _Vector2 operator*(const _Vector2& v) { return _Vector2(x * v.x, y * v.y); }
+	__host__ __device__ _Vector2 operator/(const _Vector2& v) { return _Vector2(x / v.x, y / v.y); }
+	__host__ __device__ _Vector2 operator*(const float& s) { return _Vector2(x * s, y * s); }
+	__host__ __device__ _Vector2 operator*(const float& s) const { return _Vector2(x * s, y * s); }
+	__host__ __device__ _Vector2 operator/(const float& s) { return _Vector2<T>(x / s, y / s); }
+	__host__ __device__ _Vector2 operator-() { return _Vector2(-x, -y); }
+	__host__ __device__ void operator=(const _Vector2& v) { memcpy(this, &v, sizeof(_Vector2)); }
+	__host__ __device__ bool operator==(const _Vector2& v) { return x == v.x && y == v.y; }
+	__host__ __device__ bool operator!=(const _Vector2& v) { return !(*this == v); }
+	__host__ __device__ T& operator[](const int& i) { return (&x)[i]; }
+	__host__ __device__ const T& operator[](const int& i) const { return (&x)[i]; }
 
 	__host__ __device__ _Vector2(T x = 0, T y = 0) : x(x), y(y) {}
 	__host__ __device__ _Vector2(const _Vector2& v) : x(v.x), y(v.y) {}
-
-	__host__ __device__ float Length() const
-	{
-		return sqrt(x * x + y * y);
-	}
-
-	__host__ __device__ void Normalize()
-	{
-		float l = Length();
-		x = x / l;
-		y = y / l;
-	}
-
-	__host__ __device__ _Vector2 GetNormalized() const
-	{
-		_Vector2 res;
-		float l = Length();
-		res.x = x / l;
-		res.y = y / l;
-
-		return res;
-	}	
-
-	__host__ __device__ void Print()
-	{
-		printf("(x: %f, y: %f)\n", x, y);
-	}
+	__host__ __device__ float Length() const { return sqrt(x * x + y * y); }
+	__host__ __device__ void Normalize() { float l = Length(); x /= l; y /= l; }
+	__host__ __device__ _Vector2 GetNormalized() const { float l = Length(); return _Vector2(x / l, y / l); }
+	__host__ __device__ void Print() { printf("(x: %f, y: %f)\n", x, y); }
 };
 
 template <typename T>
@@ -130,106 +57,34 @@ public:
 	static const _Vector3 AxisY;
 	static const _Vector3 AxisZ;
 
-	__host__ __device__ _Vector3 operator+(const _Vector3& v)
-	{
-		return _Vector3(x + v.x, y + v.y, z + v.z);
-	}
-
-	__host__ __device__ _Vector3 operator-(const _Vector3& v) const
-	{
-		return _Vector3(x - v.x, y - v.y, z - v.z);
-	}
-
-	__host__ __device__ _Vector3 operator*(const _Vector3& v)
-	{
-		return _Vector3(x * v.x, y * v.y, z * v.z);
-	}
-
-	__host__ __device__ _Vector3 operator/(const _Vector3& v)
-	{
-		return _Vector3(x / v.x, y / v.y, z / v.z);
-	}
-
-	__host__ __device__ _Vector3 operator*(const float& s)
-	{
-		return _Vector3(x * s, y * s, z * s);
-	}
-
-	__host__ __device__ _Vector3 operator*(const float& s) const
-	{
-		return _Vector3(x * s, y * s, z * s);
-	}
-
-	__host__ __device__ _Vector3 operator/(const float& s)
-	{
-		return _Vector3<T>(x / s, y / s, z / s);
-	}
-
-	__host__ __device__ _Vector3 operator-()
-	{
-		return _Vector3(-x, -y, -z);
-	}
-
-	__host__ __device__ void operator=(const _Vector3& v)
-	{
-		memcpy(this, &v, sizeof(_Vector3));
-	}
-
-	__host__ __device__ bool operator==(const _Vector3& v)
-	{
-		return x == v.x && y == v.y && z == v.z ? true : false;
-	}
-
-	__host__ __device__ bool operator!=(const _Vector3& v)
-	{
-		return x == v.x && y == v.y && z == v.z ? false : true;
-	}
-
-	__host__ __device__ T& operator[](const int& i)
-	{		
-		return x;
-	}
+	__host__ __device__ _Vector3 operator+(const _Vector3& v) { return _Vector3(x + v.x, y + v.y, z + v.z); }
+	__host__ __device__ _Vector3 operator-(const _Vector3& v) const { return _Vector3(x - v.x, y - v.y, z - v.z); }
+	__host__ __device__ _Vector3 operator*(const _Vector3& v) { return _Vector3(x * v.x, y * v.y, z * v.z); }
+	__host__ __device__ _Vector3 operator/(const _Vector3& v) { return _Vector3(x / v.x, y / v.y, z / v.z); }
+	__host__ __device__ _Vector3 operator*(const float& s) { return _Vector3(x * s, y * s, z * s); }
+	__host__ __device__ _Vector3 operator*(const float& s) const { return _Vector3(x * s, y * s, z * s); }
+	__host__ __device__ _Vector3 operator/(const float& s) { return _Vector3<T>(x / s, y / s, z / s); }
+	__host__ __device__ _Vector3 operator-() { return _Vector3(-x, -y, -z); }
+	__host__ __device__ void operator=(const _Vector3& v) { memcpy(this, &v, sizeof(_Vector3)); }
+	__host__ __device__ bool operator==(const _Vector3& v) { return x == v.x && y == v.y && z == v.z; }
+	__host__ __device__ bool operator!=(const _Vector3& v) { return !(*this == v); }
+	__host__ __device__ T& operator[](const int& i) { return (&x)[i]; }
+	__host__ __device__ const T& operator[](const int& i) const { return (&x)[i]; }
 
 	__host__ __device__ _Vector3(T x = 0, T y = 0, T z = 0) : x(x), y(y), z(z) { }
 	__host__ __device__ _Vector3(const _Vector3& v) : x(v.x), y(v.y), z(v.z) { }
-
-	__host__ __device__ float Length() const
-	{
-		return sqrt(x * x + y * y + z * z);
-	}
-
-	__host__ __device__ void Normalize()
-	{
-		float l = Length();
-		x = x / l;
-		y = y / l;
-		z = z / l;
-	}
-
-	__host__ __device__ _Vector3 GetNormalized() const
-	{
-		_Vector3 res;
-		float l = Length();
-		res.x = x / l;
-		res.y = y / l;
-		res.z = z / l;
-
-		return res;
-	}
-
+	__host__ __device__ float Length() const { return sqrt(x * x + y * y + z * z); }
+	__host__ __device__ void Normalize() { float l = Length(); x /= l; y /= l; z /= l; }
+	__host__ __device__ _Vector3 GetNormalized() const { float l = Length(); return _Vector3(x / l, y / l, z / l); }
 	__host__ __device__ _Rotator<T> Rotation()
 	{
-		_Rotator<T> R;
-		R.yaw = atan2(y, x) / PI * 180.0f;
-		R.pitch = atan2(z, sqrt(x * x + y * y)) / PI * 180.0f;
-		R.roll = 0.0f;
-		return R;
+		_Rotator<T> r;
+		r.yaw = atan2(y, x) / PI * 180.0f;
+		r.pitch = atan2(z, sqrt(x * x + y * y)) / PI * 180.0f;
+		r.roll = 0.0f;
+		return r;
 	}
-	
-	__host__ __device__ void Print()
-	{
-		printf("(x: %f, y: %f, z: %f)\n",x ,y, z);
-	}
+	__host__ __device__ void Print() { printf("(x: %f, y: %f, z: %f)\n", x, y, z); }
 };
 
 template <typename T>
@@ -243,93 +98,24 @@ public:
 
 	static const _Vector4 Zero;
 
-	__host__ __device__ _Vector4 operator+(const _Vector4& v)
-	{
-		return _Vector4(x + v.x, y + v.y, z + v.z, w + v.w);
-	}
-
-	__host__ __device__ _Vector4 operator-(const _Vector4& v)
-	{
-		return _Vector4(x - v.x, y - v.y, z - v.z, w - v.w);
-	}
-
-	__host__ __device__ _Vector4 operator*(const _Vector4& v)
-	{
-		return _Vector4(x * v.x, y * v.y, z * v.z, w * v.w);
-	}
-
-	__host__ __device__ _Vector4 operator/(const _Vector4& v)
-	{
-		return _Vector4(x / v.x, y / v.y, z / v.z, w / v.w);
-	}
-
-	__host__ __device__ _Vector4 operator*(const float& s)
-	{
-		return _Vector4(x * s, y * s, z * s, w * s);
-	}
-
-	__host__ __device__ _Vector4 operator/(const float& s)
-	{
-		return _Vector4(x / s, y / s, z / s, w / s);
-	}
-
-	__host__ __device__ _Vector4 operator-()
-	{
-		return _Vector4(-x, -y, -z, -w);
-	}
-
-	__host__ __device__ void operator=(const _Vector4& v)
-	{
-		memcpy(this, &v, sizeof(_Vector4));
-	}
-
-	__host__ __device__ bool operator==(const _Vector4& v)
-	{
-		return x == v.x && y == v.y && z == v.z && w == v.w ? true : false;
-	}
-
-	__host__ __device__ bool operator!=(const _Vector4& v)
-	{
-		return x == v.x && y == v.y && z == v.z && w == v.w ? false : true;
-	}
-
-	__host__ __device__ T& operator[](const int& i)
-	{
-		return x;
-	}
+	__host__ __device__ _Vector4 operator+(const _Vector4& v) { return _Vector4(x + v.x, y + v.y, z + v.z, w + v.w); }
+	__host__ __device__ _Vector4 operator-(const _Vector4& v) { return _Vector4(x - v.x, y - v.y, z - v.z, w - v.w); }
+	__host__ __device__ _Vector4 operator*(const _Vector4& v) { return _Vector4(x * v.x, y * v.y, z * v.z, w * v.w); }
+	__host__ __device__ _Vector4 operator/(const _Vector4& v) { return _Vector4(x / v.x, y / v.y, z / v.z, w / v.w); }
+	__host__ __device__ _Vector4 operator*(const float& s) { return _Vector4(x * s, y * s, z * s, w * s); }
+	__host__ __device__ _Vector4 operator/(const float& s) { return _Vector4(x / s, y / s, z / s, w / s); }
+	__host__ __device__ _Vector4 operator-() { return _Vector4(-x, -y, -z, -w); }
+	__host__ __device__ void operator=(const _Vector4& v) { memcpy(this, &v, sizeof(_Vector4)); }
+	__host__ __device__ bool operator==(const _Vector4& v) { return x == v.x && y == v.y && z == v.z && w == v.w; }
+	__host__ __device__ bool operator!=(const _Vector4& v) { return !(*this == v); }
+	__host__ __device__ T& operator[](const int& i) { return (&x)[i]; }
+	__host__ __device__ const T& operator[](const int& i) const { return (&x)[i]; }
 
 	__host__ __device__ _Vector4(T x = 0, T y = 0, T z = 0, T w = 0) : x(x), y(y), z(z), w(w) { }
-
-	__host__ __device__ float Length()
-	{
-		return sqrt(x * x + y * y + z * z + w * w);
-	}
-
-	__host__ __device__ void Normalize()
-	{
-		float l = Length();
-		x = x / l;
-		y = y / l;
-		z = z / l;
-		w = w / l;
-	}
-
-	__host__ __device__ _Vector4 GetNormalized()
-	{
-		_Vector4 res;
-		float l = Length();
-		res.x = x / l;
-		res.y = y / l;
-		res.z = z / l;
-		res.w = w / l;
-
-		return res;
-	}
-
-	__host__ void Print()
-	{
-		printf("(x: %f, y: %f, z: %f, w: %f)\n", x, y, z, w);
-	}
+	__host__ __device__ float Length() { return sqrt(x * x + y * y + z * z + w * w); }
+	__host__ __device__ void Normalize() { float l = Length(); x /= l; y /= l; z /= l; w /= l; }
+	__host__ __device__ _Vector4 GetNormalized() { float l = Length(); return _Vector4(x / l, y / l, z / l, w / l); }
+	__host__ void Print() { printf("(x: %f, y: %f, z: %f, w: %f)\n", x, y, z, w); }
 };
 
 using Vector2I = _Vector2<int>;
