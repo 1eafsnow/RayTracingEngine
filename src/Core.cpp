@@ -125,7 +125,6 @@ int main(int, char**)
     renderer.sampleProb = 0.8;
     renderer.sampleDepth = 8;
     renderer.filterKernelSize = 1;
-    renderer.Init();
 
     GUI gui;
     gui.SetRenderer(&renderer);
@@ -133,6 +132,9 @@ int main(int, char**)
     {
         return 1;
     }
+
+    renderer.Init();
+    gui.InitializeRendererInterop();
 
     while (!gui.ShouldClose())
     {
