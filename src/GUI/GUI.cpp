@@ -34,7 +34,7 @@ bool GUI::Open()
     }
 
     glfwMakeContextCurrent(glWindow);
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
