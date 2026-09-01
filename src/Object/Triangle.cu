@@ -32,7 +32,7 @@ void Triangle::Init()
     Vector3 edge1 = v1->worldLocation - v0->worldLocation;
     Vector3 edge2 = v2->worldLocation - v0->worldLocation;
     Vector3 faceNormal = Cross(edge1, edge2);
-    if (faceNormal.Length() <= 1e-8f)
+    if (Dot(faceNormal, faceNormal) <= 1e-16f)
     {
         normal = Vector3::Zero;
         distance = 0.0f;
@@ -43,7 +43,7 @@ void Triangle::Init()
     if (vertexNormal)
     {
         Vector3 averageNormal = v0->worldDirection + v1->worldDirection + v2->worldDirection;
-        if (averageNormal.Length() > 1e-8f && Dot(normal, averageNormal) < 0.0f)
+        if (Dot(averageNormal, averageNormal) > 1e-16f && Dot(normal, averageNormal) < 0.0f)
         {
             normal = -normal;
         }
@@ -82,26 +82,34 @@ __device__ Vector3 Triangle::GetNormal(DeviceWorld* world, const Vector3& baryce
         return normal;
     }
 
-    Vector3 result = GetVertex(world, 0)->worldDirection * barycentricCoordinate.x +
-                     GetVertex(world, 1)->worldDirection * barycentricCoordinate.y +
-                     GetVertex(world, 2)->worldDirection * barycentricCoordinate.z;
-    return result.Length() > 1e-8f ? result.GetNormalized() : normal;
+    const Vertex& v0 = world->vertices[vertexIdx[0]];
+    const Vertex& v1 = world->vertices[vertexIdx[1]];
+    const Vertex& v2 = world->vertices[vertexIdx[2]];
+    Vector3 result = v0.worldDirection * barycentricCoordinate.x + v1.worldDirection * barycentricCoordinate.y + v2.worldDirection * barycentricCoordinate.z;
+    const float lengthSquared = Dot(result, result);
+    if (lengthSquared <= 1e-16f)
+    {
+        return normal;
+    }
+    return result / sqrtf(lengthSquared);
 }
 
 __device__ Vector3 Triangle::GetAlbedo(DeviceWorld* world, const Vector3& barycentricCoordinate)
 {
-    Material* material = GetMaterial(world);
-    if (material->textureIdx >= 0 && material->textureIdx < world->texturesSize)
+    Material* material = world->materials + materialIdx;
+    if (material->textureIdx < 0 || material->textureIdx >= world->texturesSize)
     {
-        Texture* texture = world->textures + material->textureIdx;
-        return texture->GetColor(world, GetVertex(world, 0)->textureCoordinate.x, GetVertex(world, 0)->textureCoordinate.y) * barycentricCoordinate.x +
-               texture->GetColor(world, GetVertex(world, 1)->textureCoordinate.x, GetVertex(world, 1)->textureCoordinate.y) * barycentricCoordinate.y +
-               texture->GetColor(world, GetVertex(world, 2)->textureCoordinate.x, GetVertex(world, 2)->textureCoordinate.y) * barycentricCoordinate.z;
+        return material->albedo;
     }
-    return material->albedo;
+
+    const Vertex& v0 = world->vertices[vertexIdx[0]];
+    const Vertex& v1 = world->vertices[vertexIdx[1]];
+    const Vertex& v2 = world->vertices[vertexIdx[2]];
+    Vector2 uv = v0.textureCoordinate * barycentricCoordinate.x + v1.textureCoordinate * barycentricCoordinate.y + v2.textureCoordinate * barycentricCoordinate.z;
+    return world->textures[material->textureIdx].GetColor(world, uv.x, uv.y);
 }
 
-__device__ bool Triangle::IncludeDetect(DeviceWorld* world, Vector3& location, Vector3& coordinate)
+__device__ bool Triangle::IncludeDetect(DeviceWorld* world, const Vector3& location, Vector3& coordinate)
 {
     Vector3 a = world->vertices[vertexIdx[0]].worldLocation;
     Vector3 b = world->vertices[vertexIdx[1]].worldLocation;
@@ -126,7 +134,7 @@ __device__ bool Triangle::IncludeDetect(DeviceWorld* world, Vector3& location, V
     coordinate.y = (acac * apab - abac * apac) / denominator;
     coordinate.x = 1.0f - coordinate.y - coordinate.z;
     return coordinate.x >= 0.0f && coordinate.y >= 0.0f && coordinate.z >= 0.0f &&
-           coordinate.x <= 1.0f && coordinate.y <= 1.0f && coordinate.z <= 1.0f;
+        coordinate.x <= 1.0f && coordinate.y <= 1.0f && coordinate.z <= 1.0f;
 }
 
 __device__ bool Triangle::HitDetect(DeviceWorld* world, Ray* ray, RayHitResult* hitResult)
@@ -141,7 +149,8 @@ __device__ bool Triangle::HitDetect(DeviceWorld* world, Ray* ray, RayHitResult* 
 
     if (in > 0.0f)
     {
-        if (!GetMaterial(world)->backVisible)
+        Material* material = world->materials + materialIdx;
+        if (!material->backVisible)
         {
             return false;
         }
@@ -164,7 +173,7 @@ __device__ bool Triangle::HitDetect(DeviceWorld* world, Ray* ray, RayHitResult* 
     }
 
     hitResult->isHit = true;
-    hitResult->material = GetMaterial(world);
+    hitResult->material = world->materials + materialIdx;
     hitResult->color = GetAlbedo(world, coordinate);
     hitResult->distance = rayDistance;
     hitResult->location = location;
