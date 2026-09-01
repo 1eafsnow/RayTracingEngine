@@ -42,6 +42,8 @@ public:
 class Renderer
 {
 public:
+    static constexpr int OpenGLPixelBufferCount = 2;
+
     int index = 0;
     int width = 0;
     int height = 0;
@@ -73,6 +75,10 @@ public:
     unsigned int pixelBufferObject = 0;
     bool graphicsInteropEnabled = false;
 
+    cudaGraphicsResource* cudaPixelBufferResources[OpenGLPixelBufferCount]{};
+    unsigned int pixelBufferObjects[OpenGLPixelBufferCount]{};
+    int preparedPixelBufferIndex = -1;
+
     int devThreadNum = 256;
 
     float sampleProb = 0.8f;
@@ -96,6 +102,11 @@ public:
     bool RegisterOpenGLPixelBuffer(unsigned int bufferObject);
     void UnregisterOpenGLPixelBuffer();
     bool IsGraphicsInteropEnabled() const;
+
+    bool RegisterOpenGLPixelBuffers(const unsigned int* bufferObjects, int count);
+    void PrepareOpenGLPixelBufferForFrame();
+    void UnregisterOpenGLPixelBuffers();
+    unsigned int GetCompletedOpenGLPixelBufferObject() const;
 };
 
 void Test();
