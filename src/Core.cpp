@@ -22,8 +22,6 @@ int getThreadNum()
 
 int main(int, char**)
 {
-    getThreadNum();
-
     int sphereFront = GetWorld()->CreateSphere();
     GetWorld()->GetSphere(sphereFront)->SetWorldLocation(Vector3(0.0, 0.0, 1000.0));
     GetWorld()->GetSphere(sphereFront)->SetRadius(995.0);
@@ -134,6 +132,7 @@ int main(int, char**)
     }
 
     renderer.Init();
+    getThreadNum();
     gui.InitializeRendererInterop();
 
     while (!gui.ShouldClose())
