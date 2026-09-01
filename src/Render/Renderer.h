@@ -49,6 +49,7 @@ public:
     int height = 0;
     uint8_t* pixelsData = nullptr;
     bool pixelsDataPinned = false;
+    bool initialized = false;
 
     float translateX = 0.0f;
     float translateY = 0.0f;
@@ -99,10 +100,7 @@ public:
     void Tick2(float deltaTime);
     void TestTick(float deltaTime);
 
-    bool RegisterOpenGLPixelBuffer(unsigned int bufferObject);
-    void UnregisterOpenGLPixelBuffer();
     bool IsGraphicsInteropEnabled() const;
-
     bool RegisterOpenGLPixelBuffers(const unsigned int* bufferObjects, int count);
     void PrepareOpenGLPixelBufferForFrame();
     void UnregisterOpenGLPixelBuffers();
