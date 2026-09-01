@@ -99,7 +99,7 @@ public:
     void Tick(float deltaTime);
     void Tick2(float deltaTime);
     void TestTick(float deltaTime);
-    void ResetAccumulation();
+    void ResetAccumulation() { frame = 0; }
 
     bool IsGraphicsInteropEnabled() const;
     bool RegisterOpenGLPixelBuffers(const unsigned int* bufferObjects, int count);
