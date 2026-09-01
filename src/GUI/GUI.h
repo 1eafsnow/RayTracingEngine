@@ -29,7 +29,8 @@ public:
 
     Renderer* renderer = nullptr;
     GLuint pixelBufferObjects[Renderer::OpenGLPixelBufferCount]{};
-    GLuint renderTexture = 0;
+    GLuint renderTextures[Renderer::OpenGLPixelBufferCount]{};
+    int displayTextureIndex = 0;
 
     bool objectWindow = false;
 
