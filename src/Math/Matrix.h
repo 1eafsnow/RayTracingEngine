@@ -44,11 +44,11 @@ public:
 	__host__ __device__ _Matrix3(T* elements) { memcpy(this->elements, elements, sizeof(T) * 9); }
 	__host__ __device__ _Matrix3(const _Matrix3& matrix) { memcpy(elements, matrix.elements, sizeof(T) * 9); }
 	__host__ __device__ _Matrix3(T e00, T e01, T e02,
-								T e10, T e11, T e12,
-								T e20, T e21, T e22) :
-								elements{ e00, e01, e02,
-										  e10, e11, e12,
-										  e20, e21, e22 } { }
+		T e10, T e11, T e12,
+		T e20, T e21, T e22) :
+		elements{ e00, e01, e02,
+			e10, e11, e12,
+			e20, e21, e22 } { }
 
 	__host__ __device__ T* Array()
 	{
@@ -71,8 +71,8 @@ public:
 	__host__ __device__ void Print()
 	{
 		std::cout << elements[0] << ', ' << elements[1] << ', ' << elements[2] << std::endl
-				  << elements[3] << ', ' << elements[4] << ', ' << elements[5] << std::endl
-				  << elements[6] << ', ' << elements[7] << ', ' << elements[8] << std::endl;
+			<< elements[3] << ', ' << elements[4] << ', ' << elements[5] << std::endl
+			<< elements[6] << ', ' << elements[7] << ', ' << elements[8] << std::endl;
 	}
 };
 
@@ -109,13 +109,13 @@ public:
 	__host__ __device__ _Matrix4(T* elements) { memcpy(this->elements, elements, sizeof(T) * 16); }
 	__host__ __device__ _Matrix4(const _Matrix4& matrix) { memcpy(elements, matrix.elements, sizeof(T) * 16); }
 	__host__ __device__ _Matrix4(T e00, T e01, T e02, T e03,
-								T e10, T e11, T e12, T e13,
-								T e20, T e21, T e22, T e23,
-								T e30, T e31, T e32, T e33) :
-								elements{ e00, e01, e02, e03,
-										  e10, e11, e12, e13,
-										  e20, e21, e22, e23,
-										  e30, e31, e32, e33 } { }
+		T e10, T e11, T e12, T e13,
+		T e20, T e21, T e22, T e23,
+		T e30, T e31, T e32, T e33) :
+		elements{ e00, e01, e02, e03,
+			e10, e11, e12, e13,
+			e20, e21, e22, e23,
+			e30, e31, e32, e33 } { }
 
 	__host__ __device__ T* Array()
 	{
@@ -129,7 +129,7 @@ public:
 		{
 			for (int j = 0; j < 4; j++)
 			{
-				res[i][j] = *(this)[j][i];
+				res[i][j] = (*this)[j][i];
 			}
 		}
 		return res;
@@ -149,9 +149,9 @@ public:
 	__host__ __device__ void Print()
 	{
 		std::cout << elements[0] << ', ' << elements[1] << ', ' << elements[2] << ', ' << elements[3] << std::endl
-				  << elements[4] << ', ' << elements[5] << ', ' << elements[6] << ', ' << elements[7] << std::endl
-				  << elements[8] << ', ' << elements[9] << ', ' << elements[10] << ', ' << elements[11] << std::endl
-				  << elements[12] << ', ' << elements[13] << ', ' << elements[14] << ', ' << elements[15] << std::endl;
+			<< elements[4] << ', ' << elements[5] << ', ' << elements[6] << ', ' << elements[7] << std::endl
+			<< elements[8] << ', ' << elements[9] << ', ' << elements[10] << ', ' << elements[11] << std::endl
+			<< elements[12] << ', ' << elements[13] << ', ' << elements[14] << ', ' << elements[15] << std::endl;
 	}
 };
 
@@ -161,13 +161,13 @@ using Matrix3 = Matrix3F;
 using Matrix4 = Matrix4F;
 
 const Matrix3F Matrix3F::UNIT = Matrix3F(1.0, 0.0, 0.0,
-										 0.0, 1.0, 0.0,
-										 0.0, 0.0, 1.0);
+	0.0, 1.0, 0.0,
+	0.0, 0.0, 1.0);
 
 const Matrix4F Matrix4F::UNIT = Matrix4F(1.0, 0.0, 0.0, 0.0,
-										 0.0, 1.0, 0.0, 0.0,
-										 0.0, 0.0, 1.0, 0.0,
-										 0.0, 0.0, 0.0, 1.0);
+	0.0, 1.0, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.0, 0.0, 0.0, 1.0);
 
 std::ostream& operator<<(std::ostream& os, const Matrix3F& v);
 std::ostream& operator<<(std::ostream& os, const Matrix4F& v);
