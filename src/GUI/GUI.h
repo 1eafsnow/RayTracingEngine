@@ -4,36 +4,35 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include <GLFW/glfw3.h>
 #include <Render/Renderer.h>
-#include <Windows.h>
 #include <vector>
 
 static void glfw_error_callback(int error, const char* description)
 {
-	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
 class GUI
 {
 public:
-	int width;
-	int height;
+    int width = 0;
+    int height = 0;
 
-	int pixelWidth;
-	int pixelHeight;
+    int pixelWidth = 0;
+    int pixelHeight = 0;
 
-	GLFWwindow* glWindow;
-	ImGuiIO* io;
+    GLFWwindow* glWindow = nullptr;
+    ImGuiIO* io = nullptr;
 
-	Renderer* renderer;
-		
-	bool objectWindow;
+    Renderer* renderer = nullptr;
 
-	void DrawPixels(unsigned char* pixels);
+    bool objectWindow = false;
 
-	void SetRenderer(Renderer* renderer);
-	void Open();
-	void Close();
-	void Tick(float deltaTime);
+    void DrawPixels(unsigned char* pixels);
+    void SetRenderer(Renderer* renderer);
+    bool Open();
+    void Close();
+    void Tick(float deltaTime);
+    bool ShouldClose() const;
 };
