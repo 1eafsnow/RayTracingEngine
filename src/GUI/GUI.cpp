@@ -3,13 +3,14 @@
 
 void GUI::DrawPixels(unsigned char* pixels)
 {
-    if (pixels == nullptr || renderTexture == 0)
+    if (pixels == nullptr || renderTextures[0] == 0)
     {
         return;
     }
 
+    displayTextureIndex = 0;
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, renderTexture);
+    glBindTexture(GL_TEXTURE_2D, renderTextures[displayTextureIndex]);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -89,23 +90,27 @@ bool GUI::Open()
     }
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-    glGenTextures(1, &renderTexture);
-    if (renderTexture == 0)
-    {
-        fprintf(stderr, "Failed to create render texture.\n");
-        Close();
-        return false;
-    }
-
-    glBindTexture(GL_TEXTURE_2D, renderTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenTextures(Renderer::OpenGLPixelBufferCount, renderTextures);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, pixelWidth, pixelHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    for (int i = 0; i < Renderer::OpenGLPixelBufferCount; i++)
+    {
+        if (renderTextures[i] == 0)
+        {
+            fprintf(stderr, "Failed to create render texture %d.\n", i);
+            Close();
+            return false;
+        }
+
+        glBindTexture(GL_TEXTURE_2D, renderTextures[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, pixelWidth, pixelHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    displayTextureIndex = 0;
     return true;
 }
 
@@ -137,18 +142,14 @@ void GUI::Close()
         renderer->UnregisterOpenGLPixelBuffers();
     }
 
-    if (renderTexture != 0 && glWindow != nullptr)
-    {
-        glDeleteTextures(1, &renderTexture);
-        renderTexture = 0;
-    }
-
     if (glWindow != nullptr)
     {
+        glDeleteTextures(Renderer::OpenGLPixelBufferCount, renderTextures);
         glDeleteBuffers(Renderer::OpenGLPixelBufferCount, pixelBufferObjects);
     }
     for (int i = 0; i < Renderer::OpenGLPixelBufferCount; i++)
     {
+        renderTextures[i] = 0;
         pixelBufferObjects[i] = 0;
     }
 
@@ -170,27 +171,38 @@ void GUI::Close()
 
 void GUI::UpdateRenderTexture()
 {
-    if (renderer == nullptr || renderTexture == 0)
+    if (renderer == nullptr)
     {
         return;
     }
 
-    glBindTexture(GL_TEXTURE_2D, renderTexture);
-
     const GLuint completedPbo = renderer->GetCompletedOpenGLPixelBufferObject();
     if (renderer->IsGraphicsInteropEnabled() && completedPbo != 0)
     {
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, completedPbo);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    }
-    else if (renderer->pixelsData != nullptr)
-    {
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, renderer->pixelsData);
-    }
+        int uploadIndex = 0;
+        for (int i = 0; i < Renderer::OpenGLPixelBufferCount; i++)
+        {
+            if (pixelBufferObjects[i] == completedPbo)
+            {
+                uploadIndex = i;
+                break;
+            }
+        }
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+        if (renderTextures[uploadIndex] != 0)
+        {
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, completedPbo);
+            glBindTexture(GL_TEXTURE_2D, renderTextures[uploadIndex]);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            displayTextureIndex = uploadIndex;
+        }
+    }
+    else if (renderer->pixelsData != nullptr && renderTextures[0] != 0)
+    {
+        DrawPixels(renderer->pixelsData);
+    }
 }
 
 void GUI::Tick(float deltaTime)
@@ -203,9 +215,9 @@ void GUI::Tick(float deltaTime)
     ImGui::NewFrame();
 
     UpdateRenderTexture();
-    if (renderTexture != 0)
+    if (renderTextures[displayTextureIndex] != 0)
     {
-        ImTextureID textureId = (ImTextureID)(intptr_t)renderTexture;
+        ImTextureID textureId = (ImTextureID)(intptr_t)renderTextures[displayTextureIndex];
         ImGui::GetBackgroundDrawList()->AddImage(textureId, ImVec2(0.0f, 0.0f), ImVec2(static_cast<float>(pixelWidth), static_cast<float>(pixelHeight)), ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
     }
 
@@ -216,7 +228,7 @@ void GUI::Tick(float deltaTime)
     const float renderFps = renderer->frameTime > 0 ? 1000.0f / static_cast<float>(renderer->frameTime) : 0.0f;
     ImGui::Text("Render average %lld ms/frame (%.1f FPS)", static_cast<long long>(renderer->frameTime), renderFps);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
-    ImGui::Text("Pixel transfer: %s", renderer->IsGraphicsInteropEnabled() ? "CUDA/OpenGL double PBO" : "Pinned host texture upload");
+    ImGui::Text("Pixel transfer: %s", renderer->IsGraphicsInteropEnabled() ? "CUDA/OpenGL PBO x2 + Texture x2" : "Pinned host texture upload");
     ImGui::End();
 
     ImGui::Render();
