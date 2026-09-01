@@ -25,6 +25,8 @@ public:
     void Look(const Vector3& direction);
     void Tick(float deltaTime);
 
+    float GetYaw() const;
+    float GetPitch() const;
     Vector3 GetForwardVector() const;
     Vector3 GetRightVector() const;
     Vector3 GetUpVector() const;
