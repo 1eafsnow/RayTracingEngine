@@ -34,7 +34,7 @@ int main(int, char**)
     GetWorld()->GetSphere(sphereFront)->GetMaterial()->refractionIndex = 2.0;
 
     int sphereBack = GetWorld()->CreateSphere();
-    GetWorld()->GetSphere(sphereBack)->SetWorldLocation(Vector3(0.0, 0.0, -1000.0));
+    GetWorld()->GetSphere(sphereBack)->SetWorldLocation(Vector3(0.0, 0.0, -1004.0));
     GetWorld()->GetSphere(sphereBack)->SetRadius(995.0);
     GetWorld()->GetSphere(sphereBack)->GetMaterial()->isEmit = false;
     GetWorld()->GetSphere(sphereBack)->GetMaterial()->albedo = Vector3(0.8, 0.8, 0.8) / 10;
@@ -115,7 +115,7 @@ int main(int, char**)
     GetCamera()->focus = 0.01;
     GetCamera()->fovX = fovX;
     GetCamera()->fovY = fovY;
-    GetCamera()->worldLocation = Vector3(0.0, -3.0, -4.0);
+    GetCamera()->worldLocation = Vector3(0.0, -3.0, -8.0);
     GetCamera()->worldRotation = Rotator(0.0, 0.0, 0.0);
 
     Renderer renderer;
