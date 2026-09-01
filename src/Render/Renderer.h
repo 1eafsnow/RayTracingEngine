@@ -62,8 +62,8 @@ public:
     Material* devMaterials = nullptr;
     Texture* devTextures = nullptr;
     uint8_t* devTexturePixels = nullptr;
-    Ray* devRays = nullptr;
-    RayHitResult* devHitResults = nullptr;
+    BVHNode* devBVHNodes = nullptr;
+    int* devBVHTriangleIndices = nullptr;
     float* devRadiometry = nullptr;
     uint8_t* devPixels = nullptr;
     DeviceWorld devWorld{};
