@@ -7,6 +7,7 @@ struct BVHNode
     Vector3 boundsMax;
     int left = -1;
     int right = -1;
+    int next = -1;
     int start = 0;
     int count = 0;
 
