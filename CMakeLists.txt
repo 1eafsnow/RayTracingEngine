@@ -16,7 +16,7 @@ find_package(CUDAToolkit REQUIRED)
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/3rd/assimp)
-include_directories(${PROJECT_SOURCE_DIR}/3rd/glew-2.2.0/include)
+include_directories(${PROJECT_SOURCE_DIR}/3rd/glew-2.2.0)
 include_directories(${PROJECT_SOURCE_DIR}/3rd/glfw-3.3.8)
 include_directories(${PROJECT_SOURCE_DIR}/3rd/imgui-1.90.4)
 include_directories(${PROJECT_SOURCE_DIR}/3rd/stb)
