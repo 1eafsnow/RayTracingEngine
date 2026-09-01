@@ -19,6 +19,17 @@ enum class IndirectSampleMode : int
     GGX = 2
 };
 
+enum class SamplingMode : int
+{
+    DirectOnly = 0,
+    UniformHemisphere = 1,
+    CosineHemisphere = 2,
+    GGX = 3,
+    DirectUniformHemisphere = 4,
+    DirectCosineHemisphere = 5,
+    DirectGGX = 6
+};
+
 template <typename T>
 class Binding
 {
@@ -86,7 +97,7 @@ public:
     int sampleDepth = 8;
     int sampleTimes = 32;
     int filterKernelSize = 1;
-    IndirectSampleMode indirectSampleMode = IndirectSampleMode::CosineHemisphere;
+    SamplingMode samplingMode = SamplingMode::DirectCosineHemisphere;
 
     int sampleCount = 0;
     int frame = 0;
