@@ -43,5 +43,11 @@ public:
     bool ShouldClose() const;
 
 private:
+    bool cameraLookActive = false;
+    double lastMouseX = 0.0;
+    double lastMouseY = 0.0;
+
     void UpdateRenderTexture();
+    void UpdateCameraControls(float deltaTime);
+    bool IsCursorInRenderViewport(double x, double y) const;
 };
