@@ -3,177 +3,172 @@
 
 Vertex* Triangle::GetVertex(int idx)
 {
-	return GetWorld()->GetVertex(vertexIdx[idx]);
+    return GetWorld()->GetVertex(vertexIdx[idx]);
 }
 
 Normal* Triangle::GetVertexNormal(int idx)
 {
-	//return GetWorld()->GetNormal(normalIdx[idx]);
-	return nullptr;
+    (void)idx;
+    return nullptr;
 }
 
 Material* Triangle::GetMaterial()
 {
-	return &GetWorld()->materials[materialIdx];
+    return GetWorld()->GetMaterial(materialIdx);
 }
 
 void Triangle::Init()
 {
-	Vector3 v1 = GetVertex(1)->worldLocation - GetVertex(0)->worldLocation;
-	Vector3 v2 = GetVertex(2)->worldLocation - GetVertex(0)->worldLocation;
-	normal = Cross(v1, v2).GetNormalized();
+    Vertex* v0 = GetVertex(0);
+    Vertex* v1 = GetVertex(1);
+    Vertex* v2 = GetVertex(2);
+    if (v0 == nullptr || v1 == nullptr || v2 == nullptr)
+    {
+        normal = Vector3::Zero;
+        distance = 0.0f;
+        return;
+    }
 
-	if (vertexNormal)
-	{
-		if (Dot(normal, GetVertexNormal(0)->worldDirection + GetVertexNormal(1)->worldDirection + GetVertexNormal(2)->worldDirection) < 0)
-		{
-			//int temp = vertexIdx[1];
-			//vertexIdx[1] = vertexIdx[2];
-			//vertexIdx[2] = temp;
-			normal = -normal;
-		}
-	}
+    Vector3 edge1 = v1->worldLocation - v0->worldLocation;
+    Vector3 edge2 = v2->worldLocation - v0->worldLocation;
+    Vector3 faceNormal = Cross(edge1, edge2);
+    if (faceNormal.Length() <= 1e-8f)
+    {
+        normal = Vector3::Zero;
+        distance = 0.0f;
+        return;
+    }
 
-	distance = -Dot(GetVertex(0)->worldLocation, normal);
+    normal = faceNormal.GetNormalized();
+    if (vertexNormal)
+    {
+        Vector3 averageNormal = v0->worldDirection + v1->worldDirection + v2->worldDirection;
+        if (averageNormal.Length() > 1e-8f && Dot(normal, averageNormal) < 0.0f)
+        {
+            normal = -normal;
+        }
+    }
+    distance = -Dot(v0->worldLocation, normal);
 }
 
 void Triangle::Reverse()
 {
-	normal = -normal;
-	distance = -Dot(GetVertex(0)->worldLocation, normal);
+    normal = -normal;
+    Vertex* v0 = GetVertex(0);
+    distance = v0 != nullptr ? -Dot(v0->worldLocation, normal) : 0.0f;
 }
 
-Vertex* Triangle::GetVertex(DeviceWorld* world, int idx)
+__device__ Vertex* Triangle::GetVertex(DeviceWorld* world, int idx)
 {
-	return world->vertices + vertexIdx[idx];
+    return world->vertices + vertexIdx[idx];
 }
 
-Normal* Triangle::GetNormal(DeviceWorld* world, int idx)
+__device__ Normal* Triangle::GetNormal(DeviceWorld* world, int idx)
 {
-	//return world->normals + normalIdx[idx];
-	return nullptr;
+    (void)world;
+    (void)idx;
+    return nullptr;
 }
 
-Material* Triangle::GetMaterial(DeviceWorld* world)
+__device__ Material* Triangle::GetMaterial(DeviceWorld* world)
 {
-	return world->materials + materialIdx;
+    return world->materials + materialIdx;
 }
 
-Vector3 Triangle::GetNormal(DeviceWorld* world, const Vector3& barycentricCoordinate)
+__device__ Vector3 Triangle::GetNormal(DeviceWorld* world, const Vector3& barycentricCoordinate)
 {
-	if (vertexNormal)
-	{
-		return GetVertex(world, 0)->worldDirection * barycentricCoordinate.x + 
-			   GetVertex(world, 1)->worldDirection * barycentricCoordinate.y + 
-			   GetVertex(world, 2)->worldDirection * barycentricCoordinate.z;
-	}
-	else
-	{
-		return normal;
-	}
+    if (!vertexNormal)
+    {
+        return normal;
+    }
+
+    Vector3 result = GetVertex(world, 0)->worldDirection * barycentricCoordinate.x +
+                     GetVertex(world, 1)->worldDirection * barycentricCoordinate.y +
+                     GetVertex(world, 2)->worldDirection * barycentricCoordinate.z;
+    return result.Length() > 1e-8f ? result.GetNormalized() : normal;
 }
 
-Vector3 Triangle::GetAlbedo(DeviceWorld* world, const Vector3& barycentricCoordinate)
+__device__ Vector3 Triangle::GetAlbedo(DeviceWorld* world, const Vector3& barycentricCoordinate)
 {
-	if (GetMaterial(world)->textureIdx >= 0)
-	{
-		Texture* texture = world->textures + GetMaterial(world)->textureIdx;
-		return texture->GetColor(world, GetVertex(world, 0)->textureCoordinate.x, GetVertex(world, 0)->textureCoordinate.y) * barycentricCoordinate.x +
-			texture->GetColor(world, GetVertex(world, 1)->textureCoordinate.x, GetVertex(world, 1)->textureCoordinate.y) * barycentricCoordinate.y +
-			texture->GetColor(world, GetVertex(world, 2)->textureCoordinate.x, GetVertex(world, 2)->textureCoordinate.y) * barycentricCoordinate.z;
-	}	
-	else
-	{
-		return (world->materials + materialIdx)->albedo;
-	}
+    Material* material = GetMaterial(world);
+    if (material->textureIdx >= 0 && material->textureIdx < world->texturesSize)
+    {
+        Texture* texture = world->textures + material->textureIdx;
+        return texture->GetColor(world, GetVertex(world, 0)->textureCoordinate.x, GetVertex(world, 0)->textureCoordinate.y) * barycentricCoordinate.x +
+               texture->GetColor(world, GetVertex(world, 1)->textureCoordinate.x, GetVertex(world, 1)->textureCoordinate.y) * barycentricCoordinate.y +
+               texture->GetColor(world, GetVertex(world, 2)->textureCoordinate.x, GetVertex(world, 2)->textureCoordinate.y) * barycentricCoordinate.z;
+    }
+    return material->albedo;
 }
 
-bool Triangle::IncludeDetect(DeviceWorld* world, Vector3& location, Vector3& coordinate)
+__device__ bool Triangle::IncludeDetect(DeviceWorld* world, Vector3& location, Vector3& coordinate)
 {
-	//int vIdx1 = vertexIdx[0] * 3;
-	//int vIdx2 = vertexIdx[1] * 3;
-	//int vIdx3 = vertexIdx[2] * 3;
-	//Vector3 vLocation1(vertices[vIdx1], vertices[vIdx1 + 1], vertices[vIdx1 + 2]);
-	//Vector3 vLocation2(vertices[vIdx2], vertices[vIdx2 + 1], vertices[vIdx2 + 2]);
-	//Vector3 vLocation3(vertices[vIdx3], vertices[vIdx3 + 1], vertices[vsIdx3 + 2]);
-	Vector3 vLocation1 = world->vertices[vertexIdx[0]].worldLocation;
-	Vector3 vLocation2 = world->vertices[vertexIdx[1]].worldLocation;
-	Vector3 vLocation3 = world->vertices[vertexIdx[2]].worldLocation;
+    Vector3 a = world->vertices[vertexIdx[0]].worldLocation;
+    Vector3 b = world->vertices[vertexIdx[1]].worldLocation;
+    Vector3 c = world->vertices[vertexIdx[2]].worldLocation;
 
-	Vector3 ab = vLocation2 - vLocation1;
-	Vector3 ac = vLocation3 - vLocation1;
-	Vector3 ap = location - vLocation1;
+    Vector3 ab = b - a;
+    Vector3 ac = c - a;
+    Vector3 ap = location - a;
 
-	float abab = Dot(ab, ab);
-	float acac = Dot(ac, ac);
-	float abac = Dot(ab, ac);
-	float apab = Dot(ap, ab);
-	float apac = Dot(ap, ac);
+    float abab = Dot(ab, ab);
+    float acac = Dot(ac, ac);
+    float abac = Dot(ab, ac);
+    float apab = Dot(ap, ab);
+    float apac = Dot(ap, ac);
+    float denominator = abab * acac - abac * abac;
+    if (fabsf(denominator) < 1e-12f)
+    {
+        return false;
+    }
 
-	float f = abab * acac - abac * abac;
-
-	coordinate.z = (abab * apac - abac * apab) / f;
-	if (coordinate.z < 0 || coordinate.z > 1)
-	{
-		return false;
-	}
-	coordinate.y = (acac * apab - abac * apac) / f;
-	if (coordinate.y < 0 || coordinate.y > 1)
-	{
-		return false;
-	}
-	coordinate.x = (1 - coordinate.y - coordinate.z);
-	if (coordinate.x < 0)
-	{
-		return false;
-	}
-	return true;
+    coordinate.z = (abab * apac - abac * apab) / denominator;
+    coordinate.y = (acac * apab - abac * apac) / denominator;
+    coordinate.x = 1.0f - coordinate.y - coordinate.z;
+    return coordinate.x >= 0.0f && coordinate.y >= 0.0f && coordinate.z >= 0.0f &&
+           coordinate.x <= 1.0f && coordinate.y <= 1.0f && coordinate.z <= 1.0f;
 }
 
-bool Triangle::HitDetect(DeviceWorld* world, Ray* ray, RayHitResult* hitResult)
+__device__ bool Triangle::HitDetect(DeviceWorld* world, Ray* ray, RayHitResult* hitResult)
 {
-	Vector3 n = normal;
-	float in = Dot(ray->direction, n);
-	float d = this->distance;
+    Vector3 n = normal;
+    float d = distance;
+    float in = Dot(ray->direction, n);
+    if (fabsf(in) < 1e-7f)
+    {
+        return false;
+    }
 
-	if (in == 0.0)
-	{
-		return false;
-	}
-	if (in > 0.0)
-	{
-		if ((world->materials + materialIdx)->backVisible)
-		{
-			n = -n;
-			in = -in;
-			d = -d;
-		}
-		else
-		{
-			return false;
-		}
-	}
+    if (in > 0.0f)
+    {
+        if (!GetMaterial(world)->backVisible)
+        {
+            return false;
+        }
+        n = -n;
+        in = -in;
+        d = -d;
+    }
 
-	float l = Dot(ray->location, n) + d;
-	float distance = -l / in;
-	if (distance < MIN_DETECT_DISTANCE || distance > hitResult->distance)
-	{
-		return false;
-	}
+    float rayDistance = -(Dot(ray->location, n) + d) / in;
+    if (rayDistance < MIN_DETECT_DISTANCE || rayDistance > hitResult->distance)
+    {
+        return false;
+    }
 
-	Vector3 location = ray->location + ray->direction * distance;
-	Vector3 coordinate;
+    Vector3 location = ray->location + ray->direction * rayDistance;
+    Vector3 coordinate;
+    if (!IncludeDetect(world, location, coordinate))
+    {
+        return false;
+    }
 
-	if (!IncludeDetect(world, location, coordinate))
-	{
-		return false;
-	}
-	hitResult->isHit = true;
-	hitResult->material = world->materials + materialIdx;
-	hitResult->color = GetAlbedo(world, coordinate);
-	hitResult->distance = distance;
-	hitResult->location = location;
-	hitResult->normal = n;
-
-	return true;
+    hitResult->isHit = true;
+    hitResult->material = GetMaterial(world);
+    hitResult->color = GetAlbedo(world, coordinate);
+    hitResult->distance = rayDistance;
+    hitResult->location = location;
+    hitResult->normal = GetNormal(world, coordinate);
+    hitResult->objectId = id;
+    return true;
 }
