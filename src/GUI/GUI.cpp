@@ -317,13 +317,33 @@ void GUI::Tick(float deltaTime)
     }
 
     ImGui::SetNextWindowPos(ImVec2(static_cast<float>(pixelWidth), 0.0f));
-    ImGui::SetNextWindowSize(ImVec2(300.0f, 500.0f));
+    ImGui::SetNextWindowSize(ImVec2(300.0f, 560.0f));
     ImGui::Begin("World");
 
     const float renderFps = renderer->frameTime > 0 ? 1000.0f / static_cast<float>(renderer->frameTime) : 0.0f;
     ImGui::Text("Render average %lld ms/frame (%.1f FPS)", static_cast<long long>(renderer->frameTime), renderFps);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
     ImGui::Text("Pixel transfer: %s", renderer->IsGraphicsInteropEnabled() ? "CUDA/OpenGL PBO x2 + Texture x2" : "Pinned host texture upload");
+
+    ImGui::Separator();
+    ImGui::Text("Sampling");
+    static const char* samplingModes[] =
+    {
+        "Direct only",
+        "Indirect - Uniform hemisphere",
+        "Indirect - Cosine hemisphere",
+        "Indirect - GGX",
+        "Direct + Uniform hemisphere",
+        "Direct + Cosine hemisphere",
+        "Direct + GGX"
+    };
+    int samplingMode = static_cast<int>(renderer->samplingMode);
+    if (ImGui::Combo("Mode", &samplingMode, samplingModes, static_cast<int>(sizeof(samplingModes) / sizeof(samplingModes[0]))))
+    {
+        renderer->samplingMode = static_cast<SamplingMode>(samplingMode);
+        renderer->ResetAccumulation();
+    }
+    ImGui::Text("Accumulated samples: %d", renderer->frame);
 
     Camera* camera = GetCamera();
     if (camera != nullptr)
