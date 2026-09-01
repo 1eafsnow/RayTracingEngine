@@ -20,25 +20,30 @@ uint8_t* LoadImageFile(const char* path, int& width, int& height, int& channels)
 
 Vector3 Texture::GetColor(float x, float y)
 {
-	/*
-	int x2 = x * width - 0.5;
-	int y2 = y * height - 0.5;
-
-	int i = (y2 * width + x2) * channels;
-	Vector3 rgb(data[i], data[i + 1], data[i + 2]);
-	//rgb.Print();
-	return rgb / 255.0;
-	*/
 	return Vector3::Zero;
 }
 
 Vector3 Texture::GetColor(DeviceWorld* world, float x, float y)
 {
-	int x2 = x * width - 0.5;
-	int y2 = y * height - 0.5;
+	if (world == nullptr || world->texturePixels == nullptr || width <= 0 || height <= 0 || channels <= 0)
+	{
+		return Vector3::Zero;
+	}
 
-	int i = (y2 * width + x2) * channels;
-	Vector3 rgb(world->texturePixels[i], world->texturePixels[i + 1], world->texturePixels[i + 2]);
-	//rgb.Print();
-	return rgb / 255.0;
+	x = Clamp(x, 0.0f, 1.0f);
+	y = Clamp(y, 0.0f, 1.0f);
+
+	int x2 = Min((int)(x * width), width - 1);
+	int y2 = Min((int)(y * height), height - 1);
+	int i = pixelIdx + (y2 * width + x2) * channels;
+
+	if (i < 0 || i >= world->texturePixelsSize)
+	{
+		return Vector3::Zero;
+	}
+
+	float r = world->texturePixels[i] / 255.0f;
+	float g = channels > 1 && i + 1 < world->texturePixelsSize ? world->texturePixels[i + 1] / 255.0f : r;
+	float b = channels > 2 && i + 2 < world->texturePixelsSize ? world->texturePixels[i + 2] / 255.0f : r;
+	return Vector3(r, g, b);
 }
