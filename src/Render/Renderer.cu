@@ -1,6 +1,7 @@
 #include <Render/Renderer.h>
 #include <algorithm>
 #include <cfloat>
+#include <cstring>
 #include <ctime>
 #include <limits>
 #include <vector>
@@ -583,7 +584,10 @@ __device__ void StoreToneMappedPixel(uint8_t* pixels, int idx, const Vector3& li
     pixels[idx * 4 + 3] = 255;
 }
 
-__global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uint8_t* pixels, int sampleCount, int width, int height, int sampleDepth, int sampleMode, int filterKernelSize, float cameraFocus, float cameraX, float cameraY, float cameraZ, float cameraYaw, float cameraPitch, float cameraRoll, float translateX, float scaleX, float translateY, float scaleY)
+__global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uint8_t* pixels, int sampleCount, int width, int height, int sampleDepth, int sampleMode, int filterKernelSize,
+    float cameraFocus, float cameraX, float cameraY, float cameraZ,
+    float r00, float r01, float r02, float r10, float r11, float r12, float r20, float r21, float r22,
+    float translateX, float scaleX, float translateY, float scaleY)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     int pixelCount = width * height;
@@ -597,8 +601,13 @@ __global__ void KernelRayTrace(curandStateXORWOW_t* states, float* radiants, uin
     Vector3 camDirection(((x + DevRand(states + idx)) + translateX) * scaleX, ((y + DevRand(states + idx)) + translateY) * scaleY, cameraFocus);
     camDirection.Normalize();
 
-    Rotator cameraRotation(cameraYaw, cameraPitch, cameraRoll);
-    Ray ray(Vector3(cameraX, cameraY, cameraZ), cameraRotation.Rotate(camDirection));
+    Vector3 worldDirection(
+        r00 * camDirection.x + r01 * camDirection.y + r02 * camDirection.z,
+        r10 * camDirection.x + r11 * camDirection.y + r12 * camDirection.z,
+        r20 * camDirection.x + r21 * camDirection.y + r22 * camDirection.z);
+    worldDirection.Normalize();
+
+    Ray ray(Vector3(cameraX, cameraY, cameraZ), worldDirection);
     Vector3 color = FullPathRayTrace(states + idx, &ray, sampleDepth, sampleMode);
 
     float* radiant = radiants + idx * 4;
@@ -698,8 +707,20 @@ static bool CheckKernelLaunch(const char* name)
 
 Renderer::~Renderer()
 {
-    delete[] pixelsData;
-    pixelsData = nullptr;
+    UnregisterOpenGLPixelBuffer();
+
+    if (pixelsData != nullptr)
+    {
+        if (pixelsDataPinned)
+        {
+            cudaFreeHost(pixelsData);
+        }
+        else
+        {
+            delete[] pixelsData;
+        }
+        pixelsData = nullptr;
+    }
 
     cudaFree(devRandStates);
     cudaFree(devVertices);
@@ -717,6 +738,50 @@ Renderer::~Renderer()
     cudaFree(devPixels);
 }
 
+bool Renderer::RegisterOpenGLPixelBuffer(unsigned int bufferObject)
+{
+    UnregisterOpenGLPixelBuffer();
+    if (bufferObject == 0)
+    {
+        return false;
+    }
+
+    cudaError_t error = cudaGraphicsGLRegisterBuffer(&cudaPixelBufferResource, bufferObject, cudaGraphicsRegisterFlagsWriteDiscard);
+    if (error != cudaSuccess)
+    {
+        printf("cudaGraphicsGLRegisterBuffer failed with error \"%s\".\n", cudaGetErrorString(error));
+        cudaPixelBufferResource = nullptr;
+        pixelBufferObject = 0;
+        graphicsInteropEnabled = false;
+        return false;
+    }
+
+    pixelBufferObject = bufferObject;
+    graphicsInteropEnabled = true;
+    printf("CUDA/OpenGL PBO interop enabled.\n");
+    return true;
+}
+
+void Renderer::UnregisterOpenGLPixelBuffer()
+{
+    graphicsInteropEnabled = false;
+    pixelBufferObject = 0;
+    if (cudaPixelBufferResource != nullptr)
+    {
+        cudaError_t error = cudaGraphicsUnregisterResource(cudaPixelBufferResource);
+        if (error != cudaSuccess)
+        {
+            printf("cudaGraphicsUnregisterResource failed with error \"%s\".\n", cudaGetErrorString(error));
+        }
+        cudaPixelBufferResource = nullptr;
+    }
+}
+
+bool Renderer::IsGraphicsInteropEnabled() const
+{
+    return graphicsInteropEnabled && cudaPixelBufferResource != nullptr && pixelBufferObject != 0;
+}
+
 void Renderer::Init()
 {
     if (width <= 0 || height <= 0)
@@ -729,7 +794,21 @@ void Renderer::Init()
         devThreadNum = 256;
     }
 
+    unsigned int glDeviceCount = 0;
+    int glDevices[8]{};
+    cudaError_t glDeviceError = cudaGLGetDevices(&glDeviceCount, glDevices, 8, cudaGLDeviceListCurrentFrame);
+    if (glDeviceError == cudaSuccess && glDeviceCount > 0)
+    {
+        cudaSetDevice(glDevices[0]);
+        printf("CUDA/OpenGL shared device: %d.\n", glDevices[0]);
+    }
+    else
+    {
+        cudaGetLastError();
+    }
+
     const int pixelCount = width * height;
+    const size_t pixelBytes = static_cast<size_t>(pixelCount) * 4;
     dim3 blockDim(devThreadNum, 1);
     dim3 gridDim((pixelCount + devThreadNum - 1) / devThreadNum, 1);
 
@@ -743,7 +822,19 @@ void Renderer::Init()
     scaleX = (right - left) / static_cast<float>(width);
     scaleY = (top - bottom) / static_cast<float>(height);
 
-    pixelsData = new uint8_t[static_cast<size_t>(pixelCount) * 4]{};
+    cudaError_t hostAllocError = cudaHostAlloc(reinterpret_cast<void**>(&pixelsData), pixelBytes, cudaHostAllocDefault);
+    if (hostAllocError == cudaSuccess)
+    {
+        pixelsDataPinned = true;
+        std::memset(pixelsData, 0, pixelBytes);
+    }
+    else
+    {
+        cudaGetLastError();
+        pixelsDataPinned = false;
+        pixelsData = new uint8_t[pixelBytes]{};
+        printf("cudaHostAlloc pixelsData failed with error \"%s\"; using pageable memory fallback.\n", cudaGetErrorString(hostAllocError));
+    }
 
     std::vector<BVHNode> bvhNodes;
     std::vector<int> bvhTriangleIndices;
@@ -762,7 +853,7 @@ void Renderer::Init()
     CudaAlloc(&devBVHNodes, bvhNodes.size(), "devBVHNodes");
     CudaAlloc(&devBVHTriangleIndices, bvhTriangleIndices.size(), "devBVHTriangleIndices");
     CudaAlloc(&devRadiometry, static_cast<size_t>(pixelCount) * 4, "devRadiometry");
-    CudaAlloc(&devPixels, static_cast<size_t>(pixelCount) * 4, "devPixels");
+    CudaAlloc(&devPixels, pixelBytes, "devPixels");
 
     InitRandStates<<<gridDim, blockDim>>>(devRandStates, static_cast<unsigned long long>(time(nullptr)), pixelCount);
     if (!CheckKernelLaunch("InitRandStates") || cudaDeviceSynchronize() != cudaSuccess)
@@ -772,7 +863,7 @@ void Renderer::Init()
     }
 
     cudaMemset(devRadiometry, 0, sizeof(float) * static_cast<size_t>(pixelCount) * 4);
-    cudaMemset(devPixels, 0, sizeof(uint8_t) * static_cast<size_t>(pixelCount) * 4);
+    cudaMemset(devPixels, 0, pixelBytes);
 
     devWorld.vertices = devVertices;
     devWorld.verticesSize = static_cast<int>(GetWorld()->vertices.size());
@@ -828,32 +919,88 @@ void Renderer::Tick(float deltaTime)
     }
 
     const int pixelCount = width * height;
+    const size_t pixelBytes = static_cast<size_t>(pixelCount) * 4;
     dim3 blockDim(devThreadNum, 1);
     dim3 gridDim((pixelCount + devThreadNum - 1) / devThreadNum, 1);
     Camera* camera = GetCamera();
 
-    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRadiometry, devPixels, frame, width, height, sampleDepth, static_cast<int>(indirectSampleMode), filterKernelSize,
+    Quaternion cameraQuaternion = camera->worldRotation.Quaternion();
+    Matrix4 cameraMatrix = cameraQuaternion.RotationMatrix();
+
+    uint8_t* outputPixels = devPixels;
+    bool interopMapped = false;
+    if (IsGraphicsInteropEnabled())
+    {
+        cudaError_t mapError = cudaGraphicsMapResources(1, &cudaPixelBufferResource, 0);
+        if (mapError == cudaSuccess)
+        {
+            void* mappedPointer = nullptr;
+            size_t mappedBytes = 0;
+            cudaError_t pointerError = cudaGraphicsResourceGetMappedPointer(&mappedPointer, &mappedBytes, cudaPixelBufferResource);
+            if (pointerError == cudaSuccess && mappedPointer != nullptr && mappedBytes >= pixelBytes)
+            {
+                outputPixels = static_cast<uint8_t*>(mappedPointer);
+                interopMapped = true;
+            }
+            else
+            {
+                printf("cudaGraphicsResourceGetMappedPointer failed with error \"%s\".\n", cudaGetErrorString(pointerError));
+                cudaGraphicsUnmapResources(1, &cudaPixelBufferResource, 0);
+                graphicsInteropEnabled = false;
+            }
+        }
+        else
+        {
+            printf("cudaGraphicsMapResources failed with error \"%s\".\n", cudaGetErrorString(mapError));
+            graphicsInteropEnabled = false;
+        }
+    }
+
+    KernelRayTrace<<<gridDim, blockDim>>>(devRandStates, devRadiometry, outputPixels, frame, width, height, sampleDepth, static_cast<int>(indirectSampleMode), filterKernelSize,
         camera->focus, camera->worldLocation.x, camera->worldLocation.y, camera->worldLocation.z,
-        camera->worldRotation.yaw, camera->worldRotation.pitch, camera->worldRotation.roll,
+        cameraMatrix.elements[0], cameraMatrix.elements[1], cameraMatrix.elements[2],
+        cameraMatrix.elements[4], cameraMatrix.elements[5], cameraMatrix.elements[6],
+        cameraMatrix.elements[8], cameraMatrix.elements[9], cameraMatrix.elements[10],
         translateX, scaleX, translateY, scaleY);
     if (!CheckKernelLaunch("RayTrace"))
     {
+        if (interopMapped)
+        {
+            cudaGraphicsUnmapResources(1, &cudaPixelBufferResource, 0);
+        }
         return;
     }
 
     if (filterKernelSize > 1)
     {
-        KernelPixel<<<gridDim, blockDim>>>(filterKernelSize, devRadiometry, width, height, devPixels);
+        KernelPixel<<<gridDim, blockDim>>>(filterKernelSize, devRadiometry, width, height, outputPixels);
         if (!CheckKernelLaunch("Pixel"))
         {
+            if (interopMapped)
+            {
+                cudaGraphicsUnmapResources(1, &cudaPixelBufferResource, 0);
+            }
             return;
         }
     }
 
-    if (cudaError_t error = cudaMemcpy(pixelsData, devPixels, sizeof(uint8_t) * static_cast<size_t>(pixelCount) * 4, cudaMemcpyDeviceToHost))
+    if (interopMapped)
     {
-        printf("cudaMemcpy pixels failed with error \"%s\".\n", cudaGetErrorString(error));
-        return;
+        cudaError_t unmapError = cudaGraphicsUnmapResources(1, &cudaPixelBufferResource, 0);
+        if (unmapError != cudaSuccess)
+        {
+            printf("cudaGraphicsUnmapResources failed with error \"%s\".\n", cudaGetErrorString(unmapError));
+            graphicsInteropEnabled = false;
+            return;
+        }
+    }
+    else
+    {
+        if (cudaError_t error = cudaMemcpy(pixelsData, devPixels, pixelBytes, cudaMemcpyDeviceToHost))
+        {
+            printf("cudaMemcpy pixels failed with error \"%s\".\n", cudaGetErrorString(error));
+            return;
+        }
     }
 
     frame++;
