@@ -37,6 +37,7 @@ bool Renderer::RegisterOpenGLPixelBuffers(const unsigned int* bufferObjects, int
         pixelBufferObjects[i] = bufferObjects[i];
     }
 
+    index = 0;
     preparedPixelBufferIndex = 0;
     cudaPixelBufferResource = cudaPixelBufferResources[preparedPixelBufferIndex];
     pixelBufferObject = pixelBufferObjects[preparedPixelBufferIndex];
@@ -55,7 +56,7 @@ void Renderer::PrepareOpenGLPixelBufferForFrame()
         return;
     }
 
-    const int writeIndex = frame % OpenGLPixelBufferCount;
+    const int writeIndex = index % OpenGLPixelBufferCount;
     if (cudaPixelBufferResources[writeIndex] == nullptr || pixelBufferObjects[writeIndex] == 0)
     {
         graphicsInteropEnabled = false;
@@ -68,11 +69,13 @@ void Renderer::PrepareOpenGLPixelBufferForFrame()
     preparedPixelBufferIndex = writeIndex;
     cudaPixelBufferResource = cudaPixelBufferResources[writeIndex];
     pixelBufferObject = pixelBufferObjects[writeIndex];
+    index++;
 }
 
 void Renderer::UnregisterOpenGLPixelBuffers()
 {
     graphicsInteropEnabled = false;
+    index = 0;
     preparedPixelBufferIndex = -1;
     cudaPixelBufferResource = nullptr;
     pixelBufferObject = 0;
@@ -94,12 +97,12 @@ void Renderer::UnregisterOpenGLPixelBuffers()
 
 int Renderer::GetCompletedOpenGLPixelBufferIndex() const
 {
-    if (!graphicsInteropEnabled || frame <= 0)
+    if (!graphicsInteropEnabled || index <= 0)
     {
         return -1;
     }
 
-    const int completedIndex = (frame - 1) % OpenGLPixelBufferCount;
+    const int completedIndex = (index - 1) % OpenGLPixelBufferCount;
     if (cudaPixelBufferResources[completedIndex] == nullptr || pixelBufferObjects[completedIndex] == 0)
     {
         return -1;
