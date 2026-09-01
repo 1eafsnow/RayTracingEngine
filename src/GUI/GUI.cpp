@@ -96,6 +96,11 @@ bool GUI::InitializeRendererInterop()
 
 void GUI::Close()
 {
+    if (glWindow != nullptr)
+    {
+        glfwMakeContextCurrent(glWindow);
+    }
+
     if (renderer != nullptr)
     {
         renderer->UnregisterOpenGLPixelBuffer();
@@ -103,7 +108,6 @@ void GUI::Close()
 
     if (pixelBufferObject != 0 && glWindow != nullptr)
     {
-        glfwMakeContextCurrent(glWindow);
         glDeleteBuffers(1, &pixelBufferObject);
         pixelBufferObject = 0;
     }
