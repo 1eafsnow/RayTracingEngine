@@ -316,7 +316,8 @@ __device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray)
         WorldHitDetect(ray, &hit);
         if (!hit.isHit)
         {
-            return Vector3::Zero;
+            //edit
+            return Vector3(0.0f, 0.0f, 0.0f);
         }
         if (hit.material != nullptr && hit.material->isEmit)
         {
@@ -326,14 +327,14 @@ __device__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, Ray* ray)
         RaySampleResult sampleResult;
         if (!IndirectLightSampleRandom(state, ray, &hit, &sampleResult) || sampleResult.pdf <= 0.0f)
         {
-            return Vector3::Zero;
+            return Vector3(0.0f, 0.0f, 0.0f);
         }
 
         ray->depth++;
         attenuation = attenuation * sampleResult.brdf * sampleResult.cosine / sampleResult.pdf / sampleResult.attenuation;
     }
 
-    return Vector3::Zero;
+    return Vector3(0.0f, 0.0f, 0.0f);
 }
 
 __global__ void KernelRayTrace(curandStateXORWOW_t* states, Ray* rays, float* radiants, int sampleCount, int pixelCount)

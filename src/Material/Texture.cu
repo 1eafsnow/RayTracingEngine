@@ -20,14 +20,14 @@ uint8_t* LoadImageFile(const char* path, int& width, int& height, int& channels)
 
 Vector3 Texture::GetColor(float x, float y)
 {
-	return Vector3::Zero;
+	return Vector3(0.0f, 0.0f, 0.0f);
 }
 
 Vector3 Texture::GetColor(DeviceWorld* world, float x, float y)
 {
 	if (world == nullptr || world->texturePixels == nullptr || width <= 0 || height <= 0 || channels <= 0)
 	{
-		return Vector3::Zero;
+		return Vector3(0.0f, 0.0f, 0.0f);
 	}
 
 	x = Clamp(x, 0.0f, 1.0f);
@@ -39,7 +39,7 @@ Vector3 Texture::GetColor(DeviceWorld* world, float x, float y)
 
 	if (i < 0 || i >= world->texturePixelsSize)
 	{
-		return Vector3::Zero;
+		return Vector3(0.0f, 0.0f, 0.0f);
 	}
 
 	float r = world->texturePixels[i] / 255.0f;
