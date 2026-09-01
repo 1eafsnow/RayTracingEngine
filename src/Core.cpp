@@ -78,19 +78,19 @@ int main(int, char**)
     GetWorld()->GetSphere(sphereBottom)->GetMaterial()->roughness = 0.9;
     GetWorld()->GetSphere(sphereBottom)->GetMaterial()->refractionIndex = 2.0;
 
-    int light1 = GetWorld()->CreateSphere();
-    GetWorld()->GetSphere(light1)->SetWorldLocation(Vector3(-2.0, 4.0, 0.0));
-    GetWorld()->GetSphere(light1)->SetRadius(0.5);
-    GetWorld()->GetSphere(light1)->GetMaterial()->isEmit = true;
-    GetWorld()->GetSphere(light1)->GetMaterial()->emit = Vector3(1.0, 1.0, 1.0);
-    GetWorld()->GetSphere(light1)->GetMaterial()->intensity = 1000;
+    int light1 = GetWorld()->CreateLight();
+    GetWorld()->GetLight(light1)->SetWorldLocation(Vector3(-2.0, 4.0, 0.0));
+    GetWorld()->GetLight(light1)->SetRadius(0.5);
+    GetWorld()->GetLight(light1)->GetMaterial()->isEmit = true;
+    GetWorld()->GetLight(light1)->GetMaterial()->emit = Vector3(1.0, 1.0, 1.0);
+    GetWorld()->GetLight(light1)->GetMaterial()->intensity = 1000;
 
-    int light5 = GetWorld()->CreateSphere();
-    GetWorld()->GetSphere(light5)->SetWorldLocation(Vector3(2.0, 4.0, 0.0));
-    GetWorld()->GetSphere(light5)->SetRadius(0.5);
-    GetWorld()->GetSphere(light5)->GetMaterial()->isEmit = true;
-    GetWorld()->GetSphere(light5)->GetMaterial()->emit = Vector3(1.0, 1.0, 1.0);
-    GetWorld()->GetSphere(light5)->GetMaterial()->intensity = 1000;
+    int light2 = GetWorld()->CreateLight();
+    GetWorld()->GetLight(light2)->SetWorldLocation(Vector3(2.0, 4.0, 0.0));
+    GetWorld()->GetLight(light2)->SetRadius(0.5);
+    GetWorld()->GetLight(light2)->GetMaterial()->isEmit = true;
+    GetWorld()->GetLight(light2)->GetMaterial()->emit = Vector3(1.0, 1.0, 1.0);
+    GetWorld()->GetLight(light2)->GetMaterial()->intensity = 1000;
 
     int sphere1 = GetWorld()->CreateSphere();
     GetWorld()->GetSphere(sphere1)->SetWorldLocation(Vector3(0.0, -4.0, 0.0));
