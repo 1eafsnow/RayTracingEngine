@@ -197,7 +197,7 @@ __device__ __forceinline__ Vector3 SampleTextureNearest(const Texture& texture, 
 {
     if (DevWorld->texturePixels == nullptr || texture.width <= 0 || texture.height <= 0 || texture.channels <= 0)
     {
-        return Vector3::Zero;
+        return Vector3(0.0f, 0.0f, 0.0f);
     }
 
     u = Clamp(u, 0.0f, 1.0f);
@@ -207,7 +207,7 @@ __device__ __forceinline__ Vector3 SampleTextureNearest(const Texture& texture, 
     const int pixelIndex = texture.pixelIdx + (y * texture.width + x) * texture.channels;
     if (pixelIndex < 0 || pixelIndex >= DevWorld->texturePixelsSize)
     {
-        return Vector3::Zero;
+        return Vector3(0.0f, 0.0f, 0.0f);
     }
 
     const float r = DevWorld->texturePixels[pixelIndex] / 255.0f;
@@ -654,7 +654,7 @@ __device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, 
         WorldHitDetect(ray, &hit);
         if (!hit.isHit)
         {
-            return Vector3::Zero;
+            return Vector3(0.0f, 0.0f, 0.0f);
         }
         if (hit.material != nullptr && hit.material->isEmit)
         {
@@ -664,7 +664,7 @@ __device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, 
         RaySampleResult sampleResult;
         if (!IndirectLightSample(state, ray, &hit, &sampleResult, sampleMode) || sampleResult.pdf <= 0.0f)
         {
-            return Vector3::Zero;
+            return Vector3(0.0f, 0.0f, 0.0f);
         }
 
         throughput = throughput * sampleResult.brdf * (sampleResult.cosine / sampleResult.pdf);
@@ -675,13 +675,13 @@ __device__ __forceinline__ Vector3 FullPathRayTrace(curandStateXORWOW_t* state, 
             const float survivalProbability = Clamp(Max(throughput.x, Max(throughput.y, throughput.z)), 0.05f, 0.95f);
             if (DevRandOpen(state) > survivalProbability)
             {
-                return Vector3::Zero;
+                return Vector3(0.0f, 0.0f, 0.0f);
             }
             throughput = throughput / survivalProbability;
         }
     }
 
-    return Vector3::Zero;
+    return Vector3(0.0f, 0.0f, 0.0f);
 }
 
 __device__ __forceinline__ void StoreToneMappedPixel(uint8_t* pixels, int idx, const Vector3& linearColor)
