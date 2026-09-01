@@ -21,17 +21,27 @@ Camera::Camera(float focus, float fovX, float fovY) :
 {
 }
 
+float Camera::GetYaw() const
+{
+    return -worldRotation.pitch;
+}
+
+float Camera::GetPitch() const
+{
+    return -worldRotation.roll;
+}
+
 Vector3 Camera::GetForwardVector() const
 {
-    const float yaw = worldRotation.yaw * PI / 180.0f;
-    const float pitch = worldRotation.pitch * PI / 180.0f;
+    const float yaw = GetYaw() * PI / 180.0f;
+    const float pitch = GetPitch() * PI / 180.0f;
     const float cosPitch = cosf(pitch);
     return Vector3(sinf(yaw) * cosPitch, sinf(pitch), cosf(yaw) * cosPitch);
 }
 
 Vector3 Camera::GetRightVector() const
 {
-    const float yaw = worldRotation.yaw * PI / 180.0f;
+    const float yaw = GetYaw() * PI / 180.0f;
     return Vector3(cosf(yaw), 0.0f, -sinf(yaw));
 }
 
@@ -66,20 +76,23 @@ void Camera::Move(const Vector3& direction)
 
 void Camera::Look(const Vector3& direction)
 {
-    worldRotation.yaw += direction.x * deltaLookSpeed;
-    worldRotation.pitch -= direction.y * deltaLookSpeed;
-    worldRotation.pitch = std::clamp(worldRotation.pitch, -89.0f, 89.0f);
+    float yaw = GetYaw() + direction.x * deltaLookSpeed;
+    float pitch = GetPitch() - direction.y * deltaLookSpeed;
+    pitch = std::clamp(pitch, -89.0f, 89.0f);
 
-    if (worldRotation.yaw > 180.0f || worldRotation.yaw < -180.0f)
+    if (yaw > 180.0f || yaw < -180.0f)
     {
-        worldRotation.yaw = std::fmod(worldRotation.yaw + 180.0f, 360.0f);
-        if (worldRotation.yaw < 0.0f)
+        yaw = std::fmod(yaw + 180.0f, 360.0f);
+        if (yaw < 0.0f)
         {
-            worldRotation.yaw += 360.0f;
+            yaw += 360.0f;
         }
-        worldRotation.yaw -= 180.0f;
+        yaw -= 180.0f;
     }
-    worldRotation.roll = 0.0f;
+
+    worldRotation.yaw = 0.0f;
+    worldRotation.pitch = -yaw;
+    worldRotation.roll = -pitch;
 }
 
 void Camera::Tick(float deltaTime)
