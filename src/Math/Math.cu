@@ -28,9 +28,13 @@ __host__ float Random(const float& min, const float& max, const bool& lInterval,
     return min + r * (max - min);
 }
 
-__global__ void InitRandStates(curandStateXORWOW_t* states, unsigned long long seed)
+__global__ void InitRandStates(curandStateXORWOW_t* states, unsigned long long seed, int stateCount)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx >= stateCount)
+    {
+        return;
+    }
     curand_init(seed, idx, 0, states + idx);
 }
 
