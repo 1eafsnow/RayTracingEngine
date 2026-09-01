@@ -121,7 +121,7 @@ int main(int, char**)
     Renderer renderer;
     renderer.width = windowWidth;
     renderer.height = windowHeight;
-    renderer.devThreadNum = 32;
+    renderer.devThreadNum = 256;
     renderer.sampleProb = 0.8;
     renderer.sampleDepth = 8;
     renderer.filterKernelSize = 1;
